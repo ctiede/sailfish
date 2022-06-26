@@ -437,6 +437,8 @@ class UltraThinDisk(Setup):
     domain_radius = param(15.0, "half side length of the square computational domain")
     sink_rate = param(8.0, "component sink rate", mutable=True)
     buffer_is_enabled = param(True, "whether the buffer zone is enabled")
+    buffer_driving_rate = param(1e2, "rate of driving in the buffer", mutable=True)
+    buffer_onset_width = param(0.5, "buffer ramp distance", mutable=True)
     use_dg = param(False, "use the DG solver")
     ell0 = param(0.0, "initial accretion eigenvalue guess for initial density profile")
 
@@ -496,8 +498,8 @@ class UltraThinDisk(Setup):
             eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
             mach_number=self.mach_number,
             buffer_is_enabled=self.buffer_is_enabled,
-            buffer_driving_rate=100.0,
-            buffer_onset_width=1.0,
+            buffer_driving_rate=self.buffer_driving_rate,
+            buffer_onset_width=self.buffer_onset_width,
             point_mass_function=self.point_masses,
             viscosity_coefficient=self.nu,
             diagnostics=self.diagnostics,
