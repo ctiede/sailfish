@@ -432,8 +432,9 @@ class UltraThinDisk(Setup):
     sink_radius = 0.025
     softening_length = 0.025
     nu = param(0.002, "constant value of disk viscosity", mutable=True)
+    alpha = param(0.0, "alpha viscosity parameter--is used if > 0", mutable=True)
     single_point_mass = param(False, "put one point mass at the origin (no binary)")
-    sink_model = param("force_free", "sink [acceleration_free|force_free|torque_free]")
+    sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
     domain_radius = param(15.0, "half side length of the square computational domain")
     sink_rate = param(8.0, "component sink rate", mutable=True)
     buffer_is_enabled = param(True, "whether the buffer zone is enabled")
@@ -444,26 +445,30 @@ class UltraThinDisk(Setup):
 
     def primitive(self, t, coords, primitive):
         GM = 1.0
+        a  = 1.0
+        n  = 4.0
+        sigma0 = 1.0
+        r_cav  = 2.5
+        delta0 = 1e-5
         x, y = coords
-        r = sqrt(x * x + y * y)
+        r    = sqrt(x * x + y * y)
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
 
-        r_cav = 2.5
-        delta0 = 1e-5
-        sigma0 = 1.0
-        cavity = (delta0 + (1 - delta0) * exp(-((r_cav / r) ** 12)))
-        sigma = sigma0 * cavity * (1 - self.ell0 / sqrt(r))
+        if self.alpha == 0.0:
+            sigma = 1.0
+        elif self.alpha > 0.0:
+            sigma = r_softened ** -0.5
+        else:
+            raise ValueError("alpha must be zero or positive")
 
-        GM = 1.0
-        a = 1.0
-        n = 4.0
-        omegaB = (GM / a**3) ** 0.5
-        omega0 = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
-        omega = (omega0**-n + omegaB**-n) ** (-1 / n)
+        omegaB    = (GM / a ** 3) ** 0.5
+        omega0    = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
+        omega     = (omega0**-n + omegaB**-n) ** (-1 / n)
+        cavity    = exp(-((r_cav / r) ** 12))
+        vr_pert   = 1e-3 * y * exp(-((r / 3.5) ** 6))
+        jdot_term = 1 - self.ell0 / sqrt(r)
 
-        vr_pert = 1e-3 * y * exp(-((r / 3.5) ** 6))
-
-        primitive[0] = sigma
+        primitive[0] = sigma0 * sigma * jdot_term * cavity + delta0
         primitive[1] = omega * -y + vr_pert * x / r
         primitive[2] = omega * +x + vr_pert * y / r
 
@@ -502,6 +507,7 @@ class UltraThinDisk(Setup):
             buffer_onset_width=self.buffer_onset_width,
             point_mass_function=self.point_masses,
             viscosity_coefficient=self.nu,
+            alpha=self.alpha,
             diagnostics=self.diagnostics,
         )
 

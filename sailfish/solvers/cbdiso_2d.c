@@ -210,6 +210,40 @@ PRIVATE double sound_speed_squared(
     }
 }
 
+PRIVATE double disk_height(
+    double cs2,
+    double mach_squared,
+    int eos_type,
+    double x,
+    double y,
+    struct PointMassList *mass_list)
+{
+    if (mass_list->masses[0].mass == 0.0 && mass_list->masses[1].mass == 0.0)
+    {
+        return 1.0;
+    }
+    double omegatilde2 = 0.0;
+
+    for (int p = 0; p < 2; ++p)
+    { 
+        if (mass_list->masses[p].mass > 0.0)
+        {
+            double x0 = mass_list->masses[p].x;
+            double y0 = mass_list->masses[p].y;
+            double mp = mass_list->masses[p].mass;
+
+            double dx = x - x0;
+            double dy = y - y0;
+            double r2 = dx * dx + dy * dy + 1e-12;
+            double r  = sqrt(r2);
+            omegatilde2 += mp * pow(r, -3.0);
+        }
+    }
+    double cs = sqrt(sound_speed_squared(cs2, mach_squared, eos_type, x, y, mass_list));
+
+    return cs / sqrt(omegatilde2);
+}
+
 PRIVATE void buffer_source_term(
     struct KeplerianBuffer *buffer,
     double xc,
@@ -419,7 +453,8 @@ PUBLIC void cbdiso_2d_advance_rk(
     double cs2, // equation of state
     double mach_squared,
     int eos_type,
-    double nu, // kinematic viscosity coefficient
+    double visc_coeff, // kinematic viscosity coefficient
+    double alpha, // alpha viscosity value
     double a, // RK parameter
     double dt, // timestep
     double velocity_ceiling,
@@ -562,7 +597,7 @@ PUBLIC void cbdiso_2d_advance_rk(
         riemann_hlle(pljm, pljp, flj, cs2lj, 1);
         riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-        if (nu > 0.0)
+        if (visc_coeff > 0.0 || alpha > 0.0)
         {
             double sli[4];
             double sri[4];
@@ -576,14 +611,36 @@ PUBLIC void cbdiso_2d_advance_rk(
             shear_strain(gxrj, gyrj, dx, dy, srj);
             shear_strain(gxcc, gycc, dx, dy, scc);
 
-            fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-            fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-            fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-            fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-            flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-            flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-            frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-            frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+            double nucc = visc_coeff;
+            double nuli = visc_coeff;
+            double nuri = visc_coeff;
+            double nulj = visc_coeff;
+            double nurj = visc_coeff;
+
+            if (alpha > 0.0)
+            {
+                double cs2cc = sound_speed_squared(cs2, mach_squared, eos_type, xc, yc, &mass_list);
+                double hcc = disk_height(cs2, mach_squared, eos_type, xc, yc, &mass_list);
+                double hli = disk_height(cs2, mach_squared, eos_type, xl, yc, &mass_list);
+                double hri = disk_height(cs2, mach_squared, eos_type, xr, yc, &mass_list);
+                double hlj = disk_height(cs2, mach_squared, eos_type, xc, yl, &mass_list);
+                double hrj = disk_height(cs2, mach_squared, eos_type, xc, yr, &mass_list);
+
+                nucc = alpha * hcc * sqrt(cs2cc);
+                nuli = alpha * hli * sqrt(cs2li);
+                nuri = alpha * hri * sqrt(cs2ri);
+                nulj = alpha * hlj * sqrt(cs2lj);
+                nurj = alpha * hrj * sqrt(cs2rj);
+            }
+
+            fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
+            fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y
+            fri[1] -= 0.5 * (nucc * pcc[0] * scc[0] + nuri * pri[0] * sri[0]); // x-x
+            fri[2] -= 0.5 * (nucc * pcc[0] * scc[1] + nuri * pri[0] * sri[1]); // x-y
+            flj[1] -= 0.5 * (nulj * plj[0] * slj[2] + nucc * pcc[0] * scc[2]); // y-x
+            flj[2] -= 0.5 * (nulj * plj[0] * slj[3] + nucc * pcc[0] * scc[3]); // y-y
+            frj[1] -= 0.5 * (nucc * pcc[0] * scc[2] + nurj * prj[0] * srj[2]); // y-x
+            frj[2] -= 0.5 * (nucc * pcc[0] * scc[3] + nurj * prj[0] * srj[3]); // y-y
         }
         double delta_cons[3] = {0.0, 0.0, 0.0};
         primitive_to_conserved(pcc, ucc);

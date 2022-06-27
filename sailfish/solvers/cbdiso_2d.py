@@ -236,6 +236,7 @@ class Patch:
                 self.physics.mach_number**2,
                 self.physics.eos_type.value,
                 self.physics.viscosity_coefficient,
+                self.physics.alpha,
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,
@@ -284,11 +285,12 @@ class Solver(SolverBase):
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
-        if physics.viscosity_model not in (
-            ViscosityModel.NONE,
-            ViscosityModel.CONSTANT_NU,
-        ):
-            raise ValueError("solver only supports constant-nu viscosity")
+        # if physics.viscosity_model not in (
+        #     ViscosityModel.NONE,
+        #     ViscosityModel.CONSTANT_NU,
+        # ):
+        #     raise ValueError("solver only supports constant-nu viscosity")
+
 
         if physics.eos_type not in (
             EquationOfState.GLOBALLY_ISOTHERMAL,
