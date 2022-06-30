@@ -13,6 +13,7 @@ class EquationOfState(Enum):
     GLOBALLY_ISOTHERMAL = 1
     LOCALLY_ISOTHERMAL = 2
     GAMMA_LAW = 3
+    ISO_THICK_MINIDISKS = 4
 
 
 class ViscosityModel(Enum):

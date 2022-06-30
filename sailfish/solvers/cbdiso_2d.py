@@ -295,6 +295,7 @@ class Solver(SolverBase):
         if physics.eos_type not in (
             EquationOfState.GLOBALLY_ISOTHERMAL,
             EquationOfState.LOCALLY_ISOTHERMAL,
+            EquationOfState.ISO_THICK_MINIDISKS,
         ):
             raise ValueError("solver only supports isothermal equation of states")
 
@@ -416,6 +417,13 @@ class Solver(SolverBase):
                 cos_phi = x / r
                 sin_phi = y / r
                 return sigma * (cos_phi + 1.0j * sin_phi)
+                # return sigma * r * (cos_phi + 1.0j * sin_phi)  ???
+
+            # if quantity == "sigma_moment":
+            #     from math import sin, cos, atan2
+            #     sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+            #     phi = atan2(y, x)
+            #     return sigma * r**m * (cos(m * phi) + 1.0j * sin(m * phi))                
 
             if quantity == "eccentricity_vector":
                 sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])

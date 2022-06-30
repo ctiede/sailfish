@@ -442,6 +442,7 @@ class UltraThinDisk(Setup):
     buffer_onset_width = param(0.5, "buffer ramp distance", mutable=True)
     use_dg = param(False, "use the DG solver")
     ell0 = param(0.0, "initial accretion eigenvalue guess for initial density profile")
+    fix_mini_mach = param(False, "fix minidisk scale-height to h/r = mach^-1 = 0.1", mutable=True)
 
     def primitive(self, t, coords, primitive):
         GM = 1.0
@@ -456,8 +457,10 @@ class UltraThinDisk(Setup):
 
         if self.alpha == 0.0:
             sigma = 1.0
+            nu = self.nu
         elif self.alpha > 0.0:
             sigma = r_softened ** -0.5
+            nu = self.alpha / self.mach_number ** 2 * r_softened ** 0.5
         else:
             raise ValueError("alpha must be zero or positive")
 
@@ -465,12 +468,15 @@ class UltraThinDisk(Setup):
         omega0    = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
         omega     = (omega0**-n + omegaB**-n) ** (-1 / n)
         cavity    = exp(-((r_cav / r) ** 12))
-        vr_pert   = 1e-3 * y * exp(-((r / 3.5) ** 6))
         jdot_term = 1 - self.ell0 / sqrt(r)
 
+        vr_eq   = 0.0
+        # vr_eq   = -3 / 2. * nu / r_softened * exp(-((5 / r) ** 12))
+        vr_pert = 1e-2 * y * exp(-((r / 3.5) ** 6))
+
         primitive[0] = sigma0 * sigma * jdot_term * cavity + delta0
-        primitive[1] = omega * -y + vr_pert * x / r
-        primitive[2] = omega * +x + vr_pert * y / r
+        primitive[1] = omega * -y + (vr_eq + vr_pert) * x / r
+        primitive[2] = omega * +x + (vr_eq + vr_pert) * y / r
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -499,17 +505,31 @@ class UltraThinDisk(Setup):
 
     @property
     def physics(self):
-        return dict(
-            eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
-            mach_number=self.mach_number,
-            buffer_is_enabled=self.buffer_is_enabled,
-            buffer_driving_rate=self.buffer_driving_rate,
-            buffer_onset_width=self.buffer_onset_width,
-            point_mass_function=self.point_masses,
-            viscosity_coefficient=self.nu,
-            alpha=self.alpha,
-            diagnostics=self.diagnostics,
-        )
+        if self.fix_mini_mach == False:
+            return dict(
+                eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
+                mach_number=self.mach_number,
+                buffer_is_enabled=self.buffer_is_enabled,
+                buffer_driving_rate=self.buffer_driving_rate,
+                buffer_onset_width=self.buffer_onset_width,
+                point_mass_function=self.point_masses,
+                viscosity_coefficient=self.nu,
+                alpha=self.alpha,
+                diagnostics=self.diagnostics,
+            )
+        else:
+            return dict(
+                eos_type=EquationOfState.ISO_THICK_MINIDISKS,
+                mach_number=self.mach_number,
+                buffer_is_enabled=self.buffer_is_enabled,
+                buffer_driving_rate=self.buffer_driving_rate,
+                buffer_onset_width=self.buffer_onset_width,
+                point_mass_function=self.point_masses,
+                viscosity_coefficient=self.nu,
+                alpha=self.alpha,
+                diagnostics=self.diagnostics,
+            )
+
 
     @property
     def solver(self):

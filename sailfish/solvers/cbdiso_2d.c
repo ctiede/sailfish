@@ -205,6 +205,8 @@ PRIVATE double sound_speed_squared(
             return cs2;
         case 2: // locally Isothermal
             return -gravitational_potential(mass_list, x, y) / mach_squared;
+        case 4: // local-iso w/ fixed minidisk scale-height
+            return -gravitational_potential(mass_list, x, y) / pow(10.0 + (sqrt(mach_squared) - 10.0) * exp(-pow(1.0 / (x * x + y * y), 3.0)), 2.0);
         default:
             return 1.0; // WARNING
     }
