@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import cmasher
 import argparse
 import pickle
 import sys
@@ -227,7 +227,7 @@ def main_cbdiso_2d():
             print(chkpt["model_parameters"])
 
         if args.poly is None:
-            prim = chkpt["primitive"]
+            prim = chkpt["solution"]
             f = fields[args.field](prim).T
         else:
             m, n = args.poly
