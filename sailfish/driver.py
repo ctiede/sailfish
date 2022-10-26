@@ -138,8 +138,10 @@ def write_checkpoint(number, outdir, state):
     """
     if type(number) is int:
         filename = f"chkpt.{number:04d}.pk"
+    elif type(number) is str:
+        filename = f"chkpt.{number}.pk"
     else:
-        filename = f"chkpt.final.pk"
+        raise ValueError("number arg must be int or str")
 
     if outdir is not None:
         pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
@@ -179,14 +181,37 @@ def load_checkpoint(chkpt_file):
         raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
 
 
+def newest_chkpt_in_directory(directory_name):
+    import re
+
+    expr = re.compile("chkpt\.([0-9]+)\.pk")
+    list_of_matches = list(
+        filter(None, (expr.search(f) for f in os.listdir(directory_name)))
+    )
+    list_of_matches.sort(key=lambda l: int(l.groups()[0]))
+
+    for match in reversed(list_of_matches):
+        try:
+            path = os.path.join(directory_name, match.group())
+            load_checkpoint(path)  # exception if checkpoint is corrupted
+            return path
+        except:
+            logger.warning(f"skipping corrupt checkpoint file {path}")
+
+    raise ConfigurationError("the specified directory did not have usable checkpoints")
+
+
 def append_timeseries(state):
     """
     Append to the driver state timeseries for post-processing.
     """
-    try:
+
+    reductions = state.solver.reductions()
+
+    if reductions:
         state.timeseries.append(state.solver.reductions())
         logger.info(f"record timeseries event {len(state.timeseries)}")
-    except AttributeError:
+    else:
         logger.warning(
             "timeseries event ignored because solver does not provide reductions"
         )
@@ -220,12 +245,15 @@ class DriverArgs(NamedTuple):
         )
         parts = args.command.split(":")
 
-        if not parts[0].endswith(".pk"):
-            setup_name = parts[0]
-            chkpt_file = None
-        else:
+        if args.restart_dir:
+            setup_name = None
+            chkpt_file = newest_chkpt_in_directory(parts[0])
+        elif parts[0].endswith(".pk"):
             setup_name = None
             chkpt_file = parts[0]
+        else:
+            setup_name = parts[0]
+            chkpt_file = None
 
         try:
             model_parameters = dict(keyed_value(a) for a in parts[1:])
@@ -270,7 +298,6 @@ def simulate(driver):
     This function is a generator: it yields its state at a sequence of
     pause points, defined by the `events` dictionary.
     """
-
     from time import perf_counter
     from sailfish import __version__ as version
     from sailfish.kernel.system import configure_build, log_system_info, measure_time
@@ -440,9 +467,6 @@ def simulate(driver):
         siml_time = solver.time
         user_time = siml_time / reference_time
 
-        if end_time is not None and user_time >= end_time:
-            break
-
         """
         Run the main simulation loop. Iterations are grouped according the
         the fold parameter. Side effects including the iteration message are
@@ -455,14 +479,17 @@ def simulate(driver):
                 event_states[name] = state.next(user_time, event)
                 yield name, state.number, grab_state()
 
-        with measure_time() as fold_time:
+        if end_time is not None and user_time >= end_time:
+            break
+
+        with measure_time(mode) as fold_time:
             for _ in range(fold):
                 if dt is None or (iteration % new_timestep_cadence == 0):
                     dx = mesh.min_spacing(siml_time)
                     dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
                 iteration += 1
-
+                
         Mzps = mesh.num_total_zones / fold_time() * 1e-6 * fold
         main_logger.info(
             f"[{iteration:04d}] t={user_time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
@@ -598,7 +625,7 @@ def main():
     parser.add_argument(
         "command",
         nargs="?",
-        help="setup name or restart file",
+        help="setup name or restart file (if directory, then load newest checkpoint)",
     )
     parser.add_argument(
         "--describe",
@@ -647,6 +674,16 @@ def main():
         action=MakeDict,
         default=dict(),
         help="a sequence of events and recurrence rules to be emitted",
+    )
+    parser.add_argument(
+        "--restart-dir",
+        action="store_true",
+        help="the command argument is a directory; restart from newest checkpoint therein",
+    )
+    parser.add_argument(
+        "--final-chkpt",
+        action="store_true",
+        help="write chkpt.final.pk on exit",
     )
     parser.add_argument(
         "--checkpoint",
@@ -779,7 +816,8 @@ def main():
                 elif name == "checkpoint":
                     write_checkpoint(number, outdir, state)
                 elif name == "end":
-                    write_checkpoint("final", outdir, state)
+                    if args.final_chkpt:
+                        write_checkpoint("final", outdir, state)
                 elif name in events_dict:
                     events_dict[name](number, outdir, state, logger)
                 else:

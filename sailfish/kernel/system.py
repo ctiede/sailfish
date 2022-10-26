@@ -68,11 +68,14 @@ def configure_build(enable_openmp=True, extra_compile_args=None, extra_link_args
         logger.info("configure JIT build for MacOS")
         sys_compile_args = ["-Xpreprocessor", "-fopenmp"]
         sys_link_args = ["-L/usr/local/lib", "-lomp"]
-
     elif platform.system() == "Linux":
         logger.info("configure JIT build for Linux")
-        sys_compile_args = ["-fopenmp"]
+        sys_compile_args = ["-fopenmp", "-std=c99"]
         sys_link_args = ["-fopenmp"]
+    elif platform.system() == "Windows":
+        logger.info("configure JIT build for Windows")
+        sys_compile_args = []
+        sys_link_args = []
     else:
         logger.info("configure JIT build for unknown system")
         sys_compile_args = []
@@ -151,7 +154,7 @@ def log_system_info(mode):
 
 
 @contextlib.contextmanager
-def measure_time() -> float:
+def measure_time(mode: str) -> float:
     """
     A context manager to measure the execution time of a piece of code.
 
@@ -163,5 +166,11 @@ def measure_time() -> float:
             expensive_function()
         print(f"execution took {duration()} seconds")
     """
-    start = time.perf_counter()
-    yield lambda: time.perf_counter() - start
+    try:
+        start = time.perf_counter()
+        yield lambda: time.perf_counter() - start
+    finally:
+        if mode == "gpu":
+            from cupy.cuda.runtime import deviceSynchronize
+
+            deviceSynchronize()
