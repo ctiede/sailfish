@@ -259,3 +259,109 @@ class PlanarCartesian2DMesh(NamedTuple):
         ni = di[1] - di[0]
         nj = dj[1] - dj[0]
         return PlanarCartesian2DMesh(x0, y0, x1, y1, ni, nj)
+
+
+class PlanarCartesian3DMesh(NamedTuple):
+    """
+    A 3D mesh with rectangular binning.
+
+    The length of the domain is related to height by an aspect ratio. The
+    minimum demarcations along an axis is also variable allowing for
+    non-square meshing if need be.
+    """
+
+    x0: float = 0.0
+    y0: float = 0.0
+    z0: float = 0.0
+    x1: float = 1.0
+    y1: float = 1.0
+    z1: float = 1.0
+    ni: int = 1000
+    nj: int = 1000
+    nk: int = 1000
+
+    def __str__(self):
+        return f"<planar cartesian 3d: ({self.x0} -> {self.x1}) x ({self.y0} -> {self.y1}  x ({self.z0} -> {self.z1}), shape {self.shape}>"
+
+    @classmethod
+    def centered_square(cls, domain_radius, resolution):
+        x0 = -domain_radius
+        y0 = -domain_radius
+        z0 = -domain_radius
+        x1 = +domain_radius
+        y1 = +domain_radius
+        z1 = +domain_radius
+        ni = resolution
+        nj = resolution
+        nk = resolution
+        dx = 2.0 * domain_radius / resolution
+        dy = 2.0 * domain_radius / resolution
+        dz = 2.0 * domain_radius / resolution
+        return PlanarCartesian3DMesh(x0, y0, z0, x1, y1, z1, ni, nj, nk)
+
+    @classmethod
+    def centered_rectangle(cls, domain_radius, resolution, aspect: int):
+        if type(aspect) is not int:
+            raise ValueError("centered_rectangle requires aspect to be int")
+        x0 = -0.5 * domain_radius
+        y0 = -0.5 * domain_radius
+        z0 = -0.5 * domain_radius * aspect
+        x1 = +0.5 * domain_radius
+        y1 = +0.5 * domain_radius
+        y1 = +0.5 * domain_radius * aspect
+        ni = resolution
+        nj = resolution
+        nk = resolution * aspect
+        return PlanarCartesian2DMesh(x0, y0, z0, x1, y1, z1, ni, nj, nk)
+
+    @property
+    def dx(self):
+        return (self.x1 - self.x0) / self.ni
+
+    @property
+    def dy(self):
+        return (self.y1 - self.y0) / self.nj
+
+    @property
+    def dz(self):
+        return (self.z1 - self.z0) / self.nk
+
+    @property
+    def shape(self):
+        return self.ni, self.nj, self,nk
+
+    def min_spacing(self, time=None):
+        return min(min(self.dx, self.dy), self.dz)
+
+    @property
+    def num_total_zones(self):
+        return self.ni * self.nj * self.nz
+
+    def cell_coordinates(self, i, j):
+        x = self.x0 + (i + 0.5) * self.dx
+        y = self.y0 + (j + 0.5) * self.dy
+        z = self.z0 + (k + 0.5) * self.dz
+        return x, y, z
+
+    def vertex_coordinates(self, i, j, k):
+        """
+        Return the position of the lower-left corner of zone (i, j).
+        """
+        x = self.x0 + i * self.dx
+        y = self.y0 + j * self.dy
+        z = self.z0 + k * self.dz
+        return x, y, z
+
+    def sub_mesh(self, di, dj, dk):
+        """
+        Return a new mesh that is a subset of this one.
+
+        The arguments di, dj, dk are tuples, containing the lower and upper
+        index range on this mesh.
+        """
+        x0, y0, z0 = self.vertex_coordinates(di[0], dj[0], dk[0])
+        x1, y1, z1 = self.vertex_coordinates(di[1], dj[1], dk[1])
+        ni = di[1] - di[0]
+        nj = dj[1] - dj[0]
+        nk = dk[1] - dk[0]
+        return PlanarCartesian2DMesh(x0, y0, z0, x1, y1, z1, ni, nj, nk)
