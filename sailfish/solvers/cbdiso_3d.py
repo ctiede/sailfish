@@ -6,7 +6,7 @@ from logging import getLogger
 from typing import NamedTuple, List
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
-from sailfish.mesh import PlanarCartesian2DMesh
+from sailfish.mesh import PlanarCartesian3DMesh
 from sailfish.physics.circumbinary import (
     Physics,
     EquationOfState,
@@ -37,12 +37,12 @@ def initial_condition(setup, mesh, time):
     import numpy as np
 
     ni, nj, nk = mesh.shape
-    primitive = np.zeros([ni, nj, 4])
+    primitive = np.zeros([ni, nj, nk, 4])
 
     for i in range(ni):
         for j in range(nj):
             for k in range(nk):
-                setup.primitive(time, mesh.cell_coordinates(i, j), primitive[i, j])
+                setup.primitive(time, mesh.cell_coordinates(i, j, k), primitive[i, j, k])
 
     return primitive
 
@@ -92,7 +92,7 @@ class Patch:
             self.coordinate_array_x = xp.linspace(x0, x1, ni)[:, None, None]
             self.coordinate_array_y = xp.linspace(y0, y1, nj)[None, :, None]
             self.coordinate_array_z = xp.linspace(z0, z1, nk)[None, None, :]
-            self.wavespeeds = xp.zeros(primitive.shape[:2]) # <------ need edit?
+            self.wavespeeds = xp.zeros(primitive.shape[:3]) 
             self.primitive1 = xp.array(primitive)
             self.primitive2 = xp.array(primitive)
             self.conserved0 = xp.zeros(primitive.shape)

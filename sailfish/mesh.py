@@ -284,7 +284,7 @@ class PlanarCartesian3DMesh(NamedTuple):
         return f"<planar cartesian 3d: ({self.x0} -> {self.x1}) x ({self.y0} -> {self.y1}  x ({self.z0} -> {self.z1}), shape {self.shape}>"
 
     @classmethod
-    def centered_square(cls, domain_radius, resolution):
+    def centered_cube(cls, domain_radius, resolution):
         x0 = -domain_radius
         y0 = -domain_radius
         z0 = -domain_radius
@@ -300,7 +300,7 @@ class PlanarCartesian3DMesh(NamedTuple):
         return PlanarCartesian3DMesh(x0, y0, z0, x1, y1, z1, ni, nj, nk)
 
     @classmethod
-    def centered_rectangle(cls, domain_radius, resolution, aspect: int):
+    def centered_cuboid(cls, domain_radius, resolution, aspect: int):
         if type(aspect) is not int:
             raise ValueError("centered_rectangle requires aspect to be int")
         x0 = -0.5 * domain_radius
@@ -328,16 +328,16 @@ class PlanarCartesian3DMesh(NamedTuple):
 
     @property
     def shape(self):
-        return self.ni, self.nj, self,nk
+        return self.ni, self.nj, self.nk
 
     def min_spacing(self, time=None):
         return min(min(self.dx, self.dy), self.dz)
 
     @property
     def num_total_zones(self):
-        return self.ni * self.nj * self.nz
+        return self.ni * self.nj * self.nk
 
-    def cell_coordinates(self, i, j):
+    def cell_coordinates(self, i, j, k):
         x = self.x0 + (i + 0.5) * self.dx
         y = self.y0 + (j + 0.5) * self.dy
         z = self.z0 + (k + 0.5) * self.dz
@@ -364,4 +364,4 @@ class PlanarCartesian3DMesh(NamedTuple):
         ni = di[1] - di[0]
         nj = dj[1] - dj[0]
         nk = dk[1] - dk[0]
-        return PlanarCartesian2DMesh(x0, y0, z0, x1, y1, z1, ni, nj, nk)
+        return PlanarCartesian3DMesh(x0, y0, z0, x1, y1, z1, ni, nj, nk)

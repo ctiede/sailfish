@@ -76,11 +76,17 @@ class PointMass(NamedTuple):
     position_y: float = 0.0
     """ The y-position """
 
+    position_z: float = 0.0
+    """ The z-position """
+
     velocity_x: float = 0.0
     """ The x-velocity """
 
     velocity_y: float = 0.0
     """ The y-velocity """
+
+    velocity_z: float = 0.0
+    """ The z-velocity """
 
     softening_length: float = 0.0
     """ Gravitational softening length """

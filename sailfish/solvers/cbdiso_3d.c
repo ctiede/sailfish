@@ -1,7 +1,7 @@
 /*
 MODULE: cbdiso_3d
 
-DESCRIPTION: Isothermal solver for a binary accretion problem in 2D planar
+DESCRIPTION: Isothermal solver for a binary accretion problem in 3D planar
   cartesian coordinates.
 */
 
@@ -426,7 +426,6 @@ PRIVATE void riemann_hlle(
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
-// TODO : figure out this in 3D
 PUBLIC void cbdiso_3d_advance_rk(
     int ni,
     int nj,
@@ -437,9 +436,9 @@ PUBLIC void cbdiso_3d_advance_rk(
     double patch_yr,
     double patch_zl,
     double patch_zr,
-    double *conserved_rk, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *primitive_rd, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *primitive_wr, // :: $.shape == (ni + 4, nj + 4, 4)
+    double *conserved_rk, // :: $.shape == (ni + 4, nj + 4, nk + 4, 4)
+    double *primitive_rd, // :: $.shape == (ni + 4, nj + 4, nk + 4, 4)
+    double *primitive_wr, // :: $.shape == (ni + 4, nj + 4, nk + 4, 4)
     double buffer_surface_density,
     double buffer_central_mass,
     double buffer_driving_rate,
@@ -561,7 +560,7 @@ PUBLIC void cbdiso_3d_advance_rk(
         int nrjb = (i     + ng) * si + (j + 1 + ng) * sj + (k - 1 + ng) * sk;
 
         // stencil prims
-        double *un = &conserved_rk[nccc];
+        double *un = &conserved_rk[ncc];
 
         double *pcc = &primitive_rd[ncc];
         double *pli = &primitive_rd[nli];
@@ -754,8 +753,8 @@ PUBLIC void cbdiso_3d_primitive_to_conserved(
     int ni,
     int nj,
     int nk,
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *conserved) // :: $.shape == (ni + 4, nj + 4, 4)
+    double *primitive, // :: $.shape == (ni + 4, nj + 4, nk + 4, 4)
+    double *conserved) // :: $.shape == (ni + 4, nj + 4, nk + 4, 4)
 {
     int ng = 2; 
     int si = NCONS * (nj + 2 * ng) * (nk + 2 * ng); 
@@ -793,8 +792,8 @@ PUBLIC void cbdiso_3d_point_mass_source_term(
     double sink_rate1,
     double sink_radius1,
     int sink_model1,
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *cons_rate) // :: $.shape == (ni + 4, nj + 4, 4)
+    double *primitive, // :: $.shape == (ni + 4, nj + 4, nk + 4, 4)
+    double *cons_rate) // :: $.shape == (ni + 4, nj + 4, nk + 4, 4)
 {
     struct PointMass m1 = {x1, y1, z1, vx1, vy1, vz1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
 
@@ -821,7 +820,7 @@ PUBLIC void cbdiso_3d_point_mass_source_term(
 }
 
 PUBLIC void cbdiso_3d_wavespeed(
-    int ni, // mesh
+    int ni,
     int nj,
     int nk,
     double patch_xl,
@@ -855,8 +854,8 @@ PUBLIC void cbdiso_3d_wavespeed(
     double sink_rate2,
     double sink_radius2,
     int sink_model2,
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *wavespeed) // :: $.shape == (ni + 4, nj + 4)
+    double *primitive, // :: $.shape == (ni + 4, nj + 4, nk + 4, 4)
+    double *wavespeed) // :: $.shape == (ni + 4, nj + 4, nk + 4)
 {
     struct PointMass m1 = {x1, y1, z1, vx1, vy1, vz1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, z2, vx2, vy2, vz2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
@@ -866,7 +865,7 @@ PUBLIC void cbdiso_3d_wavespeed(
     int si = NCONS * (nj + 2 * ng) * (nk + 2 * ng); 
     int sj = NCONS * (nk + 2 * ng);
     int sk = NCONS;
-    int ti = (nj + 2 * ng) * (nk + 2 * ng));
+    int ti = (nj + 2 * ng) * (nk + 2 * ng);
     int tj = nk + 2 * ng;
     int tk = 1;
     double dx = (patch_xr - patch_xl)/ni;

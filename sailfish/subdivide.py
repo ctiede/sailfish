@@ -119,4 +119,24 @@ def concat_on_host(arrays: list, num_guard=None, rank=None):
 
         return result
 
+    if rank == 3:
+        ngi, ngj, ngk = num_guard or (0, 0, 0)
+        ni = sum(a.shape[0] - 2 * ngi for a in arrays)
+        nj = all_equal(a.shape[1] - 2 * ngj for a in arrays)
+        nk = all_equal(a.shape[2] - 2 * ngk for a in arrays)
+        nq = all_equal(a.shape[3:] for a in arrays)
+        si = slice(ngi, -ngi) if ngi > 0 else slice(None)
+        sj = slice(ngj, -ngj) if ngj > 0 else slice(None)
+        sk = slice(ngk, -ngk) if ngk > 0 else slice(None)
+        result = np.zeros((ni, nj, nk) + nq)
+
+        i = 0
+        for array in arrays:
+            a = i
+            b = i + array.shape[0] - 2 * ngi
+            i += b - a
+            result[a:b] = to_host(array[si, sj, sk])
+
+        return result
+
     raise ValueError(f"concatenation for arrays of rank {rank} not supported")
