@@ -390,6 +390,120 @@ def main_cbdgam_2d():
 
     plt.show()
 
+def main_cbdiso_3d():
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    fields = {
+        "sigma": lambda p: p[:, :, :, 0],
+        "vx": lambda p: p[:, :, :, 1],
+        "vy": lambda p: p[:, :, :, 2],
+        "vz": lambda p: p[:, :, :, 3],
+    }
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("checkpoints", type=str, nargs="+")
+    parser.add_argument(
+        "--field",
+        "-f",
+        type=str,
+        default="sigma",
+        choices=fields.keys(),
+        help="which field to plot",
+    )
+    parser.add_argument(
+        "--log",
+        "-l",
+        default=False,
+        action="store_true",
+        help="use log scaling",
+    )
+    parser.add_argument(
+        "--vmin",
+        default=None,
+        type=float,
+        help="minimum value for colormap",
+    )
+    parser.add_argument(
+        "--vmax",
+        default=None,
+        type=float,
+        help="maximum value for colormap",
+    )
+    parser.add_argument(
+        "--cmap",
+        default="magma",
+        help="colormap name",
+    )
+    parser.add_argument(
+        "--radius",
+        default=None,
+        type=float,
+        help="plot the domain out to this radius",
+    )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="save PNG files instead of showing a window",
+    )
+    parser.add_argument("-m", "--print-model-parameters", action="store_true")
+    args = parser.parse_args()
+
+    for filename in args.checkpoints:
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=[12, 5], sharey=True)
+        chkpt = load_checkpoint(filename)
+        mesh = chkpt["mesh"]
+        prim = chkpt["solution"]
+
+        f = fields[args.field](prim).T
+
+        if args.print_model_parameters:
+            print(chkpt["model_parameters"])
+
+        if args.log:
+            f = np.log10(f)
+
+        for ax, plane in zip([ax1, ax2, ax3], ['xy', 'xz', 'yz']):
+            if plane == 'xy':
+                extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
+                a = f[:, :, int(mesh.nk / 2)]
+                ax.set_title('xy')
+            if plane == 'xz':
+                extent = mesh.x0, mesh.x1, mesh.z0, mesh.z1
+                a = f[:, int(mesh.nj / 2), :]
+                ax.set_title('xz')
+            if plane == 'yz':
+                extent = mesh.y0, mesh.y1, mesh.z0, mesh.z1
+                a = f[int(mesh.ni / 2), :, :]
+                ax.set_title('yz')
+            cm = ax.imshow(
+                a,
+                origin="lower",
+                vmin=args.vmin,
+                vmax=args.vmax,
+                cmap=args.cmap,
+                extent=extent,
+            )
+            ax.set_aspect("equal")
+
+            if args.radius is not None:
+                ax.set_xlim(-args.radius, args.radius)
+                ax.set_ylim(-args.radius, args.radius)
+        # fig.colorbar(cm)
+        fig.suptitle(filename)
+        # fig.subplots_adjust(
+        #     left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
+        # )
+        fig.subplots_adjust(
+            left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0.05
+        )
+        if args.save:
+            pngname = filename.replace(".pk", ".png")
+            print(pngname)
+            fig.savefig(pngname, dpi=400)
+    if not args.save:
+        plt.show()
+
 
 if __name__ == "__main__":
     for arg in sys.argv:
@@ -410,5 +524,8 @@ if __name__ == "__main__":
             if chkpt["solver"] == "cbdgam_2d":
                 print("plotting for cbdgam_2d solver")
                 exit(main_cbdgam_2d())
+            if chkpt["solver"] == "cbdiso_3d":
+                print("plotting for cbdiso_3d solver")
+                exit(main_cbdiso_3d())
             else:
                 print(f"Unknown solver {chkpt['solver']}")
