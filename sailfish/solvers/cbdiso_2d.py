@@ -13,7 +13,7 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
     Diagnostic,
 )
-from sailfish.solver import SolverBase
+from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
 
 
@@ -427,6 +427,16 @@ class Solver(SolverBase):
                 ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
                 return sigma * (ex + 1.0j * ey)
 
+            if quantity == "angular_momentum":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                return sigma * (x * vy - y * vx)
+
+            if quantity == "mass":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                return sigma
+
             if quantity == "power":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion)
                 fy = get_field(patch, 2, cut, mass, gravity, accretion)
@@ -439,8 +449,7 @@ class Solver(SolverBase):
                     vx2, vy2 = m2.velocity_x, m2.velocity_y
                     return vx2 * fx + vy2 * fy
                 else:
-                    raise ValueError("Mass options for "
-                                     "power can only be 1 or 2.")
+                    raise ValueError("Mass option for 'power' must be 1 or 2.")
 
             q = quantity
             i = self.patches.index(patch)
@@ -458,7 +467,7 @@ class Solver(SolverBase):
                 f = udots1[i][..., q]
             elif mass == 2:
                 f = udots2[i][..., q]
-                
+
             return apply_radial_cut(f)
 
         def get_sum_fields(d):

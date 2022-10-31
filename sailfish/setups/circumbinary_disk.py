@@ -11,10 +11,10 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
 )
 from sailfish.physics.kepler import OrbitalElements
-from sailfish.setup import Setup, SetupError, param
+from sailfish.setup_base import SetupBase, SetupError, param
 
 
-class CircumbinaryDisk(Setup):
+class CircumbinaryDisk(SetupBase):
     r"""
     A circumbinary disk setup for binary problems, isothermal or gamma-law.
 
@@ -61,6 +61,15 @@ class CircumbinaryDisk(Setup):
     nu = param(0.001, "kinematic viscosity parameter (isothermal)")
     constant_softening = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    which_diagnostics = param("none", "diagnostics set to get from solver [none|mdots]")
+
+    def validate(self):
+        if not self.is_isothermal and not self.is_gamma_law:
+            raise SetupError(f"eos must be isothermal or gamma-law, got {self.eos}")
+        if self.which_diagnostics not in ["none", "mdots"]:
+            raise SetupError(
+                f"which_diagnostics must be none or mdots, got {self.which_diagnostics}"
+            )
 
     @property
     def is_isothermal(self):
@@ -122,7 +131,7 @@ class CircumbinaryDisk(Setup):
                 else ViscosityModel.NONE,
                 viscosity_coefficient=self.nu,
                 alpha=0.0,
-                # diagnostics=self.diagnostics,
+                diagnostics=self.diagnostics,
             )
 
         elif self.is_gamma_law:
@@ -131,8 +140,8 @@ class CircumbinaryDisk(Setup):
                 gamma_law_index=self.gamma_law_index,
                 point_mass_function=self.point_masses,
                 buffer_is_enabled=self.buffer_is_enabled,
-                buffer_driving_rate=1000.0,  # defalut value in circumbinary.py
-                buffer_onset_width=0.1,  # defalut value in circumbinary.py
+                buffer_driving_rate=1000.0,  # default value in circumbinary.py
+                buffer_onset_width=0.1,  # default value in circumbinary.py
                 cooling_coefficient=self.cooling_coefficient,
                 constant_softening=self.constant_softening,
                 viscosity_model=ViscosityModel.CONSTANT_ALPHA
@@ -140,7 +149,19 @@ class CircumbinaryDisk(Setup):
                 else ViscosityModel.NONE,
                 viscosity_coefficient=0.0,
                 alpha=self.alpha,
+                diagnostics=self.diagnostics,
             )
+
+    @property
+    def diagnostics(self):
+        if self.which_diagnostics != "none":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+            ]
+        else:
+            return []
 
     @property
     def solver(self):
@@ -160,10 +181,6 @@ class CircumbinaryDisk(Setup):
     @property
     def reference_time_scale(self):
         return 2.0 * pi
-
-    def validate(self):
-        if not self.is_isothermal and not self.is_gamma_law:
-            raise SetupError(f"eos must be isothermal or gamma-law, got {self.eos}")
 
     @property
     def orbital_elements(self):
@@ -198,8 +215,8 @@ class CircumbinaryDisk(Setup):
         return dict(point_masses=self.point_masses(time))
 
 
-class KitpCodeComparison(Setup):
-    mach_number = param(10.0, "nominal orbital Mach number")
+class KitpCodeComparison(SetupBase):
+    mach_number = param(10.0, "nominal orbital Mach number", mutable=True)
     eccentricity = param(0.0, "orbital eccentricity")
     mass_ratio = param(1.0, "binary mass ratio M2 / M1")
     sink_radius = param(0.05, "sink radius", mutable=True)
@@ -217,6 +234,10 @@ class KitpCodeComparison(Setup):
     use_dg = param(False, "use the DG solver")
     disk_kick = param(1e-4, "kick velocity to seed eccentric cavity growth")
     which_diagnostics = param("kitp", "output diagnostics option [kitp|forces]")
+
+    def validate(self):
+        if self.which_diagnostics not in ["kitp", "forces"]:
+            raise SetupError("Unknown option for diagnostics.")
 
     def primitive(self, t, coords, primitive):
         x, y = coords
@@ -312,10 +333,6 @@ class KitpCodeComparison(Setup):
     def reference_time_scale(self):
         return 2.0 * pi
 
-    def validate(self):
-        if self.which_diagnostics not in ["kitp", "forces"]:
-            raise SetupError("Unknown option for diagnostics.")
-
     @property
     def orbital_elements(self):
         return OrbitalElements(
@@ -358,7 +375,7 @@ class KitpCodeComparison(Setup):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
 
 
-class MassTransferBinary(Setup):
+class MassTransferBinary(SetupBase):
     eccentricity = param(0.0, "orbital eccentricity")
     domain_radius = param(2.0, "half side length of the square computational domain")
     mach_number = param(20.0, "orbital Mach number", mutable=True)
@@ -370,6 +387,21 @@ class MassTransferBinary(Setup):
     nu = param(1e-4, "kinematic viscosity parameter", mutable=True)
     buffer_driving_rate = param(1e2, "rate of driving in the buffer", mutable=True)
     buffer_onset_width = param(0.25, "buffer ramp distance", mutable=True)
+    sink_model = param(
+        "acceleration_free",
+        "sink [acceleration_free|force_free|torque_free]",
+        mutable=True,
+    )
+    which_diagnostics = param("torques", "[torques|forces]")
+
+    def validate(self):
+        for x in self.sink_rate + self.sink_radius + self.softening_length:
+            if type(x) is not float:
+                raise ValueError(
+                    "sink_rate, sink_radius, and softening_length parameters must be float"
+                )
+        if self.which_diagnostics not in ["torques", "forces"]:
+            raise SetupError("Unknown option for diagnostics.")
 
     def primitive(self, t, coords, primitive):
         x, y = coords
@@ -395,11 +427,30 @@ class MassTransferBinary(Setup):
 
     @property
     def diagnostics(self):
-        return [
-            dict(quantity="time"),
-            dict(quantity="mdot", which_mass=1, accretion=True),
-            dict(quantity="mdot", which_mass=2, accretion=True),
-        ]
+        if self.which_diagnostics == "torques":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="torque", which_mass="both", gravity=True),
+                dict(quantity="torque", which_mass="both", accretion=True),
+                dict(quantity="mass"),
+                dict(quantity="angular_momentum"),
+            ]
+        elif self.which_diagnostics == "forces":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="fx", which_mass=1, gravity=True),
+                dict(quantity="fx", which_mass=1, accretion=True),
+                dict(quantity="fy", which_mass=1, gravity=True),
+                dict(quantity="fy", which_mass=1, accretion=True),
+                dict(quantity="fx", which_mass=2, gravity=True),
+                dict(quantity="fx", which_mass=2, accretion=True),
+                dict(quantity="fy", which_mass=2, gravity=True),
+                dict(quantity="fy", which_mass=2, accretion=True),
+            ]
 
     @property
     def physics(self):
@@ -433,13 +484,6 @@ class MassTransferBinary(Setup):
     def reference_time_scale(self):
         return 2.0 * pi
 
-    def validate(self):
-        for x in self.sink_rate + self.sink_radius + self.softening_length:
-            if type(x) is not float:
-                raise ValueError(
-                    "sink_rate, sink_radius, and softening_length parameters must be float"
-                )
-
     @property
     def orbital_elements(self):
         return OrbitalElements(
@@ -455,14 +499,14 @@ class MassTransferBinary(Setup):
         return (
             PointMass(
                 softening_length=self.softening_length[0],
-                sink_model=SinkModel.ACCELERATION_FREE,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate[0],
                 sink_radius=self.sink_radius[0],
                 **m1._asdict(),
             ),
             PointMass(
                 softening_length=self.softening_length[1],
-                sink_model=SinkModel.ACCELERATION_FREE,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate[1],
                 sink_radius=self.sink_radius[1],
                 **m2._asdict(),
@@ -473,7 +517,7 @@ class MassTransferBinary(Setup):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
 
 
-class EccentricSingleDisk(Setup):
+class EccentricSingleDisk(SetupBase):
     eccentricity = param(0.0, "orbital eccentricity")
     domain_radius = param(6.0, "half side length of the square computational domain")
     disk_kick = param(0.1, "velocity of the kick given to the disk")

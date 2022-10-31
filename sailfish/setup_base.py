@@ -29,7 +29,7 @@ class Parameter(NamedTuple):
 param = Parameter
 
 
-class Setup(ABC):
+class SetupBase(ABC):
     """
     Abstract base class to describe a simulation model setup.
 
@@ -68,8 +68,6 @@ class Setup(ABC):
         for key, val in vars(cls).items():
             if type(val) == Parameter:
                 yield key, val.default, val.about
-            elif hasattr(cls, "__annotations__"):
-                print(cls.__annotations__)
 
     @classmethod
     def immutable_parameter_keys(cls):
