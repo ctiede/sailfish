@@ -4,13 +4,13 @@ Validation setups for various 3D solvers
 
 from sailfish.mesh import PlanarCartesian3DMesh
 from sailfish.physics.circumbinary import EquationOfState
-from sailfish.setup import Setup, param
+from sailfish.setup_base import SetupBase, param
 from math import exp
 
 __all__ = ["SphericalExplosion"]
 
 
-class SphericalExplosion(Setup):
+class SphericalExplosion(SetupBase):
     """
     A cylindrical explosion in 3D planar geometry; isothermal only.
 

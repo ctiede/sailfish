@@ -13,7 +13,7 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
     Diagnostic,
 )
-from sailfish.solver import SolverBase
+from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
 
 
@@ -46,7 +46,7 @@ def initial_condition(setup, mesh, time):
 
     return primitive
 
-# <------------ here -------------
+
 class Patch:
     """
     Holds the array buffer state for the solution on a subset of the
