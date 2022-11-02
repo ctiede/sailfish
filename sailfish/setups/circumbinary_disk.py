@@ -11,10 +11,10 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
 )
 from sailfish.physics.kepler import OrbitalElements
-from sailfish.setup import Setup, SetupError, param
+from sailfish.setup_base import SetupBase, SetupError, param
 
 
-class CircumbinaryDisk(Setup):
+class CircumbinaryDisk(SetupBase):
     r"""
     A circumbinary disk setup for binary problems, isothermal or gamma-law.
 
@@ -215,7 +215,7 @@ class CircumbinaryDisk(Setup):
         return dict(point_masses=self.point_masses(time))
 
 
-class KitpCodeComparison(Setup):
+class KitpCodeComparison(SetupBase):
     mach_number = param(10.0, "nominal orbital Mach number", mutable=True)
     eccentricity = param(0.0, "orbital eccentricity")
     mass_ratio = param(1.0, "binary mass ratio M2 / M1")
@@ -375,7 +375,7 @@ class KitpCodeComparison(Setup):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
 
 
-class MassTransferBinary(Setup):
+class MassTransferBinary(SetupBase):
     eccentricity = param(0.0, "orbital eccentricity")
     domain_radius = param(2.0, "half side length of the square computational domain")
     mach_number = param(20.0, "orbital Mach number", mutable=True)
@@ -387,6 +387,11 @@ class MassTransferBinary(Setup):
     nu = param(1e-4, "kinematic viscosity parameter", mutable=True)
     buffer_driving_rate = param(1e2, "rate of driving in the buffer", mutable=True)
     buffer_onset_width = param(0.25, "buffer ramp distance", mutable=True)
+    sink_model = param(
+        "acceleration_free",
+        "sink [acceleration_free|force_free|torque_free]",
+        mutable=True,
+    )
     which_diagnostics = param("torques", "[torques|forces]")
 
     def validate(self):
@@ -429,6 +434,8 @@ class MassTransferBinary(Setup):
                 dict(quantity="mdot", which_mass=2, accretion=True),
                 dict(quantity="torque", which_mass="both", gravity=True),
                 dict(quantity="torque", which_mass="both", accretion=True),
+                dict(quantity="mass"),
+                dict(quantity="angular_momentum"),
             ]
         elif self.which_diagnostics == "forces":
             return [
@@ -492,14 +499,14 @@ class MassTransferBinary(Setup):
         return (
             PointMass(
                 softening_length=self.softening_length[0],
-                sink_model=SinkModel.ACCELERATION_FREE,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate[0],
                 sink_radius=self.sink_radius[0],
                 **m1._asdict(),
             ),
             PointMass(
                 softening_length=self.softening_length[1],
-                sink_model=SinkModel.ACCELERATION_FREE,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate[1],
                 sink_radius=self.sink_radius[1],
                 **m2._asdict(),
@@ -510,7 +517,7 @@ class MassTransferBinary(Setup):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
 
 
-class EccentricSingleDisk(Setup):
+class EccentricSingleDisk(SetupBase):
     eccentricity = param(0.0, "orbital eccentricity")
     domain_radius = param(6.0, "half side length of the square computational domain")
     disk_kick = param(0.1, "velocity of the kick given to the disk")

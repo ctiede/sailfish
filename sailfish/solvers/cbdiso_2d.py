@@ -13,7 +13,7 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
     Diagnostic,
 )
-from sailfish.solver import SolverBase
+from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
 
 
@@ -436,6 +436,16 @@ class Solver(SolverBase):
                 ex = (v_dot_v * x - v_dot_r * vx) / GM - x / r
                 ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
                 return sigma * (ex + 1.0j * ey)
+
+            if quantity == "angular_momentum":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                return sigma * (x * vy - y * vx)
+
+            if quantity == "mass":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                return sigma
 
             if quantity == "power":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion)
