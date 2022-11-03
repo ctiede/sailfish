@@ -604,7 +604,7 @@ class EccentricSingleDisk(SetupBase):
         )
 
 
-class UltraThinDisk(Setup):
+class UltraThinDisk(SetupBase):
     mach_number = param(100.0, "disk mach number (inverse of disk scale height)")
     eccentricity = 0.0
     mass_ratio = 1.0
