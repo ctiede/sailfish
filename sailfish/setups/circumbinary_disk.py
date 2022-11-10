@@ -605,23 +605,23 @@ class EccentricSingleDisk(SetupBase):
 
 
 class UltraThinDisk(SetupBase):
-    mach_number = param(100.0, "disk mach number (inverse of disk scale height)")
-    eccentricity = 0.0
-    mass_ratio = 1.0
-    sink_radius = 0.025
-    softening_length = 0.025
-    nu = param(0.002, "constant value of disk viscosity", mutable=True)
-    alpha = param(0.0, "alpha viscosity parameter--is used if > 0", mutable=True)
-    single_point_mass = param(False, "put one point mass at the origin (no binary)")
-    sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
-    domain_radius = param(15.0, "half side length of the square computational domain")
-    sink_rate = param(8.0, "component sink rate", mutable=True)
-    buffer_is_enabled = param(True, "whether the buffer zone is enabled")
+    mach_number         = param(100.0, "disk mach number (inverse of disk scale height)")
+    eccentricity        = 0.0
+    mass_ratio          = 1.0
+    sink_radius         = param(0.025, "characteristic size of the sink region around each component", mutable=True)
+    softening_length    = param(0.025, "gravitational softening around point masses", mutable=True)
+    nu                  = param(0.002, "constant value of disk viscosity", mutable=True)
+    alpha               = param(0.0, "alpha viscosity parameter--is used if > 0", mutable=True)
+    single_point_mass   = param(False, "put one point mass at the origin (no binary)")
+    sink_model          = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
+    domain_radius       = param(15.0, "half side length of the square computational domain")
+    sink_rate           = param(8.0, "component sink rate", mutable=True)
+    buffer_is_enabled   = param(True, "whether the buffer zone is enabled")
     buffer_driving_rate = param(1e2, "rate of driving in the buffer", mutable=True)
-    buffer_onset_width = param(0.5, "buffer ramp distance", mutable=True)
-    use_dg = param(False, "use the DG solver")
-    ell0 = param(0.0, "initial accretion eigenvalue guess for initial density profile")
-    fix_mini_mach = param(False, "fix minidisk scale-height to h/r = mach^-1 = 0.1", mutable=True)
+    buffer_onset_width  = param(0.5, "buffer ramp distance", mutable=True)
+    use_dg              = param(False, "use the DG solver")
+    ell0                = param(0.0, "initial accretion eigenvalue guess for initial density profile")
+    fix_mini_mach       = param(False, "fix minidisk scale-height to h/r = mach^-1 = 0.1", mutable=True)
 
     def primitive(self, t, coords, primitive):
         GM = 1.0
