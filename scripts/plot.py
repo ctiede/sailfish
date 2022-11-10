@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import cmasher
+import cmasher as cmr
 import argparse
 import pickle
 import sys
@@ -191,7 +191,7 @@ def main_cbdiso_2d():
     )
     parser.add_argument(
         "--cmap",
-        default="magma",
+        default=cmr.sunburst,
         help="colormap name",
     )
     parser.add_argument(
