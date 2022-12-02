@@ -448,6 +448,11 @@ class Solver(SolverBase):
                     m1, m2 = self._physics.point_masses(self.time)
                     vx2, vy2 = m2.velocity_x, m2.velocity_y
                     return vx2 * fx + vy2 * fy
+                elif mass == 'both':
+                    # This might be wrong....
+                    p1 = get_field(patch, "power", cut, 1, gravity, accretion)
+                    p2 = get_field(patch, "power", cut, 2, gravity, accretion)
+                    return p1 + p2
                 else:
                     raise ValueError("Mass option for 'power' must be 1 or 2.")
 
@@ -488,9 +493,19 @@ class Solver(SolverBase):
         pass1 = []
         pass2 = []
 
+        import sailfish.physics.kepler as kepler
+        m1, m2 = self._physics.point_masses(self.time)
+        m1 = kepler.PointMass(m1.mass, m1.position_x, m1.position_y, m1.velocity_x, m1.velocity_y)
+        m2 = kepler.PointMass(m2.mass, m2.position_x, m2.position_y, m2.velocity_x, m2.velocity_y)
+        orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
+
         for d in diagnostics:
             if d.quantity == "time":
                 pass1.append(self.time / self.setup.reference_time_scale)
+            elif d.quantity == "mass-ratio":
+                pass1.append(orbital_state.mass_ratio)
+            elif d.quantity == "eccentricity":
+                pass1.append(orbital_state.eccentricity)
             else:
                 pass1.append(get_sum_fields(d))
 

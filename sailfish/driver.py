@@ -13,6 +13,7 @@ from sailfish.solvers import (
     register_solver_extension,
     make_solver,
 )
+from sailfish.physics.kepler import OrbitalState
 
 logger = getLogger(__name__)
 user_build_config = dict()
