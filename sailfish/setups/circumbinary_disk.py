@@ -533,12 +533,13 @@ class AdiabaticParamSweep(SetupBase):
         return (self.final_q - self.initial_q) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))        
 
     def orbital_elements(self, time):
-        flag = (time >= self.start_sweep_time)
+        start = self.start_sweep_time * self.reference_time_scale
+        sflag = (time >= start)
         return OrbitalElements(
             semimajor_axis=1.0,
             total_mass=1.0,
-            mass_ratio=self.initial_q + self.sweep_rate_q * (time - self.start_sweep_time) * flag,
-            eccentricity=self.initial_e + self.sweep_rate_e * (time - self.start_sweep_time) * flag,
+            mass_ratio=self.initial_q + self.sweep_rate_q * (time - start) * sflag,
+            eccentricity=self.initial_e + self.sweep_rate_e * (time - start) * sflag,
         )
 
     def point_masses(self, time):
