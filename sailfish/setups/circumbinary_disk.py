@@ -393,11 +393,11 @@ class AdiabaticParamSweep(SetupBase):
     constant_softening  = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index     = param(5.0 / 3.0, "adiabatic index (gamma-law)")
     
-    initial_e = param(0.0, "orbital eccentricity at start of sweep", mutable=True)
-    final_e   = param(0.0, "orbital eccentricity at end of sweep", mutable=True)
-    initial_q = param(1.0, "component mass ratio m2 / m1 <= 1 at start", mutable=True)
-    final_q   = param(1.0, "component mass ratio at end of sweep", mutable=True)
-    end_time  = param(1e4, "this setup uses end_time as model param; don't use driver.end_time until fixed...", mutable=True)
+    initial_e = param(0.0, "orbital eccentricity at start of sweep")
+    final_e   = param(0.0, "orbital eccentricity at end of sweep")
+    initial_q = param(1.0, "component mass ratio m2 / m1 <= 1 at start")
+    final_q   = param(1.0, "component mass ratio at end of sweep")
+    end_time  = param(1e4, "this setup uses end_time as model param; don't use driver.end_time until fixed...")
     start_sweep_time = param(500., "orbit where parameter sweeping begins")
 
     def validate(self):
