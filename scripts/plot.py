@@ -207,6 +207,11 @@ def main_cbdiso_2d():
         "--draw-lindblad31-radius",
         action="store_true",
     )
+    parser.add_argument(
+        "--orbital-elements",
+        '-oe',
+        action="store_true",
+    )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
@@ -301,12 +306,22 @@ def main_cbdiso_2d():
             r_res = 3 ** (-2 / 3) * (1 + q) ** (-1 / 3) * a
             ax.plot(x, y, ls="--", lw=0.75, c="w", alpha=1.0)
 
+        if args.orbital_elements:
+            import sailfish.physics.kepler as kepler
+            m1 = chkpt['point_masses'][0]
+            m2 = chkpt['point_masses'][1]
+            m1 = kepler.PointMass(m1.mass, m1.position_x, m1.position_y, m1.velocity_x, m1.velocity_y)
+            m2 = kepler.PointMass(m2.mass, m2.position_x, m2.position_y, m2.velocity_x, m2.velocity_y) 
+            orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
+            fig.suptitle('t={:.2f} orbits  :   e={:.3f}   q={:.3f} '.format(chkpt['time'] / 2. / np.pi, orbital_state.eccentricity, orbital_state.mass_ratio))
+        else:
+            fig.suptitle(filename)
+
         ax.set_aspect("equal")
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
         fig.colorbar(cm)
-        fig.suptitle(filename)
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
