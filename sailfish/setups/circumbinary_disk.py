@@ -398,6 +398,7 @@ class AdiabaticParamSweep(SetupBase):
     initial_q = param(1.0, "component mass ratio m2 / m1 <= 1 at start", mutable=True)
     final_q   = param(1.0, "component mass ratio at end of sweep", mutable=True)
     end_time  = param(1e4, "this setup uses end_time as model param; don't use driver.end_time until fixed...", mutable=True)
+    start_sweep_time = param(500., "orbit where parameter sweeping begins")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -525,18 +526,19 @@ class AdiabaticParamSweep(SetupBase):
 
     @property
     def sweep_rate_e(self):
-        return (self.final_e - self.initial_e) / (self.reference_time_scale * self.end_time)
+        return (self.final_e - self.initial_e) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))
 
     @property
     def sweep_rate_q(self):
-        return (self.final_q - self.initial_q) / (self.reference_time_scale * self.end_time)        
+        return (self.final_q - self.initial_q) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))        
 
     def orbital_elements(self, time):
+        flag = (time >= self.start_sweep_time)
         return OrbitalElements(
             semimajor_axis=1.0,
             total_mass=1.0,
-            mass_ratio=self.initial_q + self.sweep_rate_q * time,
-            eccentricity=self.initial_e + self.sweep_rate_e * time,
+            mass_ratio=self.initial_q + self.sweep_rate_q * (time - self.start_sweep_time) * flag,
+            eccentricity=self.initial_e + self.sweep_rate_e * (time - self.start_sweep_time) * flag,
         )
 
     def point_masses(self, time):
