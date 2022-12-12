@@ -202,8 +202,8 @@ class OrbitalState(NamedTuple):
         """
 
         return OrbitalState(
-            self[0].perturb_mass_and_momentum(dm1, dpx1, dpy1),
-            self[1].perturb_mass_and_momentum(dm2, dpx2, dpy2),
+            self[0].perturb(dm1, dpx1, dpy1),
+            self[1].perturb(dm2, dpx2, dpy2),
         )
 
     def orbital_parameters(self, t: float) -> ("OrbitalElements", "OrbitalOrientation"):

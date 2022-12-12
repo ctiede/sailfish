@@ -449,12 +449,11 @@ class Solver(SolverBase):
                     vx2, vy2 = m2.velocity_x, m2.velocity_y
                     return vx2 * fx + vy2 * fy
                 elif mass == 'both':
-                    # This might be wrong....
                     p1 = get_field(patch, "power", cut, 1, gravity, accretion)
                     p2 = get_field(patch, "power", cut, 2, gravity, accretion)
                     return p1 + p2
-                else:
-                    raise ValueError("Mass option for 'power' must be 1 or 2.")
+                # else:
+                #     raise ValueError("Mass option for 'power' must be 1 or 2.")
 
             q = quantity
             i = self.patches.index(patch)
