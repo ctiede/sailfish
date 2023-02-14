@@ -379,7 +379,7 @@ class KitpCodeComparison(SetupBase):
 class AdiabaticParamSweep(SetupBase):
     eos                 = param("isothermal", "EOS type: either isothermal or gamma-law")
     domain_radius       = param(12.0, "half side length of the square computational domain")
-    mach_number         = param(10.0, "orbital Mach number (isothermal)", mutable=True)
+    # mach_number         = param(10.0, "orbital Mach number (isothermal)", mutable=True)
     sink_rate           = param(5.0, "component sink rate", mutable=True)
     sink_radius         = param(0.03, "component sink radius", mutable=True)
     softening_length    = param(0.03, "gravitational softening length", mutable=True)
@@ -392,11 +392,14 @@ class AdiabaticParamSweep(SetupBase):
     nu                  = param(0.001, "kinematic viscosity parameter (isothermal)")
     constant_softening  = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index     = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    retrograde          = param(False, "is disk retrograde?")
     
     eccentricity_init  = param(0.0 , "orbital eccentricity at start of sweep")
-    eccentricity_final = param(0.0 , "orbital eccentricity at end of sweep")
+    eccentricity_final = param(0.0 , "orbital eccentricity at end of sweep"  )
     mass_ratio_init    = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
     mass_ratio_final   = param(1.0 , "component mass ratio at end of sweep")
+    mach_number_init   = param(10.0, "orbital Mach number (isothermal) at start of sweep")
+    mach_number_final  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
     end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...")
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
 
@@ -414,16 +417,19 @@ class AdiabaticParamSweep(SetupBase):
 
     def primitive(self, t, coords, primitive):
         GM = 1.0
+        sign = 1.0
         x, y = coords
         r = sqrt(x * x + y * y)
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
         phi_hat_x = -y / max(r, 1e-12)
         phi_hat_y = +x / max(r, 1e-12)
+        if self.retrograde == True:
+                sign = -1.
 
         if self.is_isothermal:
             primitive[0] = self.initial_sigma
-            primitive[1] = sqrt(GM / r_softened) * phi_hat_x
-            primitive[2] = sqrt(GM / r_softened) * phi_hat_y
+            primitive[1] = sqrt(GM / r_softened) * phi_hat_x * sign
+            primitive[2] = sqrt(GM / r_softened) * phi_hat_y * sign
 
         elif self.is_gamma_law:
             # See eq. (A2) from Goodman (2003)
@@ -452,8 +458,9 @@ class AdiabaticParamSweep(SetupBase):
         if self.is_isothermal:
             return dict(
                 eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
-                mach_number=self.mach_number,
                 point_mass_function=self.point_masses,
+                # mach_number=self.mach_number,
+                mach_number_function=self.mach_number,
                 buffer_is_enabled=self.buffer_is_enabled,
                 buffer_driving_rate=100.0,
                 buffer_onset_width=1.0,
@@ -465,6 +472,7 @@ class AdiabaticParamSweep(SetupBase):
                 viscosity_coefficient=self.nu,
                 alpha=0.0,
                 diagnostics=self.diagnostics,
+                retrograde=self.retrograde,
             )
 
         elif self.is_gamma_law:
@@ -483,6 +491,7 @@ class AdiabaticParamSweep(SetupBase):
                 viscosity_coefficient=0.0,
                 alpha=self.alpha,
                 diagnostics=self.diagnostics,
+                retrograde=self.retrograde,
             )
 
     @property
@@ -532,7 +541,16 @@ class AdiabaticParamSweep(SetupBase):
 
     @property
     def sweep_rate_q(self):
-        return (self.mass_ratio_final - self.mass_ratio_init) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))        
+        return (self.mass_ratio_final - self.mass_ratio_init) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))      
+
+    @property
+    def sweep_rate_mach(self):
+        return (self.mach_number_final - self.mach_number_init) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))      
+
+    def mach_number(self, time):
+        start = self.start_sweep_time * self.reference_time_scale
+        sflag = (time >= start)
+        return self.mach_number_init + self.sweep_rate_mach * (time - start) * sflag
 
     def orbital_elements(self, time):
         start = self.start_sweep_time * self.reference_time_scale

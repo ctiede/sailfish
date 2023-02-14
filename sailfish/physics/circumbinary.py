@@ -156,8 +156,8 @@ class Physics(NamedTuple):
     sound_speed: float = 1.0
     """ Isothermal sound speed, if EOS type is globally isothermal """
 
-    mach_number: float = 10.0
-    """ Square of the Mach number, if EOS type is locally isothermal """
+    # mach_number: float = 10.0
+    """ Mach number, if EOS type is locally isothermal """
 
     gamma_law_index: float = 5.0 / 3.0
     """ Adiabatic index, if the EOS type is not isothermal """
@@ -183,6 +183,9 @@ class Physics(NamedTuple):
     point_mass_function: Callable[[float], List[PointMass]] = None
     """ Callback function to supply point masses as a function of time """
 
+    mach_number_function: Callable[[float], List[float]] = None
+    """ Callback function to mach numbert as a function of time """    
+
     cooling_coefficient: float = 0.0
     """ Strength of the cooling term """
 
@@ -192,12 +195,24 @@ class Physics(NamedTuple):
     diagnostics: List[Diagnostic] = []
     """ Physics diagnostics to be returned when reductions are computed """
 
+    retrograde: bool = False
+    """ If disk is retrograde """
+
     @property
     def num_particles(self):
         if self.point_mass_function is None:
             return 0
         else:
             return len(self.point_mass_function(0.0))
+
+    def mach_number(self, time):
+        """
+          Generate mach-number from simulation time and callback
+        """
+        if self.mach_number_function is None:
+            return 10.0
+        else:
+            return self.mach_number_function(time)
 
     def point_masses(self, time):
         """

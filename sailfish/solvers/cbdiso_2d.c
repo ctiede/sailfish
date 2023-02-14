@@ -215,6 +215,7 @@ PRIVATE void buffer_source_term(
     double xc,
     double yc,
     double dt,
+    int retro,
     double *cons,
     double *delta_cons)
 {
@@ -231,6 +232,10 @@ PRIVATE void buffer_source_term(
         if (rc > onset_radius)
         {
             double v_kep = sqrt(central_mass / rc);
+            if (retro)
+            {
+                v_kep = -v_kep;
+            }
             double px = surface_density * (-yc / rc) * v_kep;
             double py = surface_density * (+xc / rc) * v_kep;
             double u0[NCONS] = {surface_density, px, py};
@@ -398,6 +403,7 @@ PUBLIC void cbdiso_2d_advance_rk(
     double buffer_outer_radius,
     double buffer_onset_width,
     int buffer_is_enabled,
+    int retrograde,
     double x1, // point mass 1
     double y1,
     double vx1,
@@ -587,7 +593,7 @@ PUBLIC void cbdiso_2d_advance_rk(
         }
         double delta_cons[3] = {0.0, 0.0, 0.0};
         primitive_to_conserved(pcc, ucc);
-        buffer_source_term(&buffer, xc, yc, dt, ucc, delta_cons);
+        buffer_source_term(&buffer, xc, yc, dt, retrograde, ucc, delta_cons);
         point_masses_source_term(&mass_list, xc, yc, dt, pcc, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)

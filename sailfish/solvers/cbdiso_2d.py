@@ -80,6 +80,7 @@ class Patch:
         self.xr, self.yr = mesh.vertex_coordinates(i1, nj)
         self.buffer_outer_radius = buffer_outer_radius
         self.buffer_surface_density = buffer_surface_density
+        self.retrograde = physics.retrograde
 
         with self.execution_context:
             x0 = self.xl + 0.5 * mesh.dx
@@ -148,7 +149,7 @@ class Patch:
                 self.yl,
                 self.yr,
                 self.physics.sound_speed**2,
-                self.physics.mach_number**2,
+                self.physics.mach_number(self.time)**2,
                 self.physics.eos_type.value,
                 m1.position_x,
                 m1.position_y,
@@ -209,6 +210,7 @@ class Patch:
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 int(self.physics.buffer_is_enabled),
+                int(self.retrograde),
                 m1.position_x,
                 m1.position_y,
                 m1.velocity_x,
@@ -228,7 +230,7 @@ class Patch:
                 m2.sink_radius,
                 m2.sink_model.value,
                 self.physics.sound_speed**2,
-                self.physics.mach_number**2,
+                self.physics.mach_number(self.time)**2,
                 self.physics.eos_type.value,
                 self.physics.viscosity_coefficient,
                 rk_param,
