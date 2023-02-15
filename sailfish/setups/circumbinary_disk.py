@@ -388,7 +388,7 @@ class AdiabaticParamSweep(SetupBase):
     initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
     initial_pressure    = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
     cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
-    alpha               = param(0.1, "alpha-viscosity parameter (gamma-law)")
+    alpha               = param(0.0, "alpha-viscosity parameter (gamma-law)")
     nu                  = param(0.001, "kinematic viscosity parameter (isothermal)")
     constant_softening  = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index     = param(5.0 / 3.0, "adiabatic index (gamma-law)")
@@ -402,6 +402,7 @@ class AdiabaticParamSweep(SetupBase):
     mach_number_final  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
     end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...")
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
+    which_diagnostics  = param("forces", "output diagnostics option [kitp|forces]")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -496,26 +497,43 @@ class AdiabaticParamSweep(SetupBase):
 
     @property
     def diagnostics(self):
-        return [
-            dict(quantity="time"),
-            dict(quantity="mass-ratio"),
-            dict(quantity="eccentricity"),
-            dict(quantity="power" , which_mass="both", gravity  =True),
-            dict(quantity="power" , which_mass="both", accretion=True),
-            dict(quantity="torque", which_mass="both", gravity  =True),
-            dict(quantity="torque", which_mass="both", accretion=True),
-            dict(quantity="mdot", which_mass=1, accretion=True),
-            dict(quantity="mdot", which_mass=2, accretion=True),
-            dict(quantity="fx"  , which_mass=1, gravity  =True),
-            dict(quantity="fx"  , which_mass=1, accretion=True),
-            dict(quantity="fy"  , which_mass=1, gravity  =True),
-            dict(quantity="fy"  , which_mass=1, accretion=True),
-            dict(quantity="fx"  , which_mass=2, gravity  =True),
-            dict(quantity="fx"  , which_mass=2, accretion=True),
-            dict(quantity="fy"  , which_mass=2, gravity  =True),
-            dict(quantity="fy"  , which_mass=2, accretion=True),
-            dict(quantity="mach-number")
-        ]
+        if self.which_diagnostics == "forces":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mass-ratio"),
+                dict(quantity="eccentricity"),
+                dict(quantity="power" , which_mass="both", gravity  =True),
+                dict(quantity="power" , which_mass="both", accretion=True),
+                dict(quantity="torque", which_mass="both", gravity  =True),
+                dict(quantity="torque", which_mass="both", accretion=True),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="fx"  , which_mass=1, gravity  =True),
+                dict(quantity="fx"  , which_mass=1, accretion=True),
+                dict(quantity="fy"  , which_mass=1, gravity  =True),
+                dict(quantity="fy"  , which_mass=1, accretion=True),
+                dict(quantity="fx"  , which_mass=2, gravity  =True),
+                dict(quantity="fx"  , which_mass=2, accretion=True),
+                dict(quantity="fy"  , which_mass=2, gravity  =True),
+                dict(quantity="fy"  , which_mass=2, accretion=True),
+                dict(quantity="mach-number"),
+            ]
+        elif self.which_diagnostics == "kitp":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mass-ratio"),
+                dict(quantity="eccentricity"),
+                dict(quantity="mach-number"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="torque", which_mass="both", gravity  =True),
+                dict(quantity="torque", which_mass="both", accretion=True),
+                dict(quantity="power", which_mass="both", gravity  =True),
+                dict(quantity="power", which_mass="both", accretion=True),
+                dict(quantity="mass"               , radial_cut=(2.0, 4.5)),
+                dict(quantity="sigma_m1"           , radial_cut=(2.0, 4.5)),
+                dict(quantity="eccentricity_vector", radial_cut=(2.0, 4.5)),
+            ]
 
     @property
     def solver(self):
