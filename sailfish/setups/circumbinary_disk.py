@@ -514,6 +514,7 @@ class AdiabaticParamSweep(SetupBase):
             dict(quantity="fx"  , which_mass=2, accretion=True),
             dict(quantity="fy"  , which_mass=2, gravity  =True),
             dict(quantity="fy"  , which_mass=2, accretion=True),
+            dict(quantity="mach-number")
         ]
 
     @property

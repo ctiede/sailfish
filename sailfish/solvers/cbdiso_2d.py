@@ -507,6 +507,10 @@ class Solver(SolverBase):
                 pass1.append(orbital_state.mass_ratio)
             elif d.quantity == "eccentricity":
                 pass1.append(orbital_state.eccentricity)
+            elif d.quantity == "mach-number":
+                mach_number = self._physics.mach_number(self.time)
+                pass1.append(mach_number)
+                print("[disk] mach={:.2f} <--> h/r={:.3f}".format(mach_number, 1. / mach_number))
             else:
                 pass1.append(get_sum_fields(d))
 
@@ -529,6 +533,10 @@ class Solver(SolverBase):
     @property
     def physics(self):
         return self._physics._asdict()
+
+    @property
+    def mach_number(self):
+        return self._physics.mach_number(self.time)
 
     @property
     def recommended_cfl(self):
