@@ -1,8 +1,9 @@
 import argparse
 import pickle
 import sys
+import cmasher as cmr
 
-sys.path.insert(1, ".")
+sys.path.insert(1, "/Users/ctiede/Research/sailfish")
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -189,7 +190,7 @@ def main_cbdiso_2d():
     )
     parser.add_argument(
         "--cmap",
-        default="magma",
+        default=cmr.sunburst,
         help="colormap name",
     )
     parser.add_argument(
@@ -210,6 +211,11 @@ def main_cbdiso_2d():
     parser.add_argument(
         "--orbital-elements",
         '-oe',
+        action="store_true",
+    )
+    parser.add_argument(
+        "--as-pdf",
+        '-pdf',
         action="store_true",
     )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
@@ -326,7 +332,10 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         if args.save:
-            pngname = filename.replace(".pk", ".png")
+            if args.as_pdf:
+                pngname = filename.replace(".pk", ".pdf")
+            else:
+                pngname = filename.replace(".pk", ".png")
             print(pngname)
             fig.savefig(pngname, dpi=400)
     if not args.save:
