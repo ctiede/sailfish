@@ -378,11 +378,11 @@ class KitpCodeComparison(SetupBase):
 
 class AdiabaticParamSweep(SetupBase):
     eos                 = param("isothermal", "EOS type: either isothermal or gamma-law")
-    domain_radius       = param(12.0, "half side length of the square computational domain")
+    domain_radius       = param(10.0, "half side length of the square computational domain")
     # mach_number         = param(10.0, "orbital Mach number (isothermal)", mutable=True)
-    sink_rate           = param(5.0, "component sink rate", mutable=True)
-    sink_radius         = param(0.03, "component sink radius", mutable=True)
-    softening_length    = param(0.03, "gravitational softening length", mutable=True)
+    sink_rate           = param(1.0, "component sink rate", mutable=True)
+    sink_radius         = param(0.05, "component sink radius", mutable=True)
+    softening_length    = param(0.05, "gravitational softening length", mutable=True)
     buffer_is_enabled   = param(True, "whether the buffer zone is enabled", mutable=True)
     sink_model          = param("torque_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
     initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
