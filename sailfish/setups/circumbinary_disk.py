@@ -537,6 +537,8 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="torque", which_mass="both", gravity=True, radial_cut=(1.0, self.domain_radius)),
                 dict(quantity="power" , which_mass="both", gravity=True, radial_cut=(0.0, 1.0)),
                 dict(quantity="power" , which_mass="both", gravity=True, radial_cut=(1.0, self.domain_radius)),
+                dict(quantity="spin"  , which_mass=1, accretion=True),
+                dict(quantity="spin"  , which_mass=2, accretion=True),
             ]
 
     @property

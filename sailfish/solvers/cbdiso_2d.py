@@ -457,6 +457,22 @@ class Solver(SolverBase):
                 # else:
                 #     raise ValueError("Mass option for 'power' must be 1 or 2.")
 
+            if quantity == "spin":
+                fx = get_field(patch, 1, cut, mass, gravity=False, accretion=True)
+                fy = get_field(patch, 2, cut, mass, gravity=False, accretion=True)
+                if mass == 1:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    x1, y1 = m1.position_x, m1.position_y
+                    return (x - x1) * fy - (y - y1) * fx
+                elif mass == 2:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    x2, y2 = m2.position_x, m2.position_y
+                    return (x - x2) * fy - (y - y2) * fx
+                elif mass == 'both':
+                    s1 = get_field(patch, "spin", cut, 1, gravity=False, accretion=True)
+                    s2 = get_field(patch, "spin", cut, 2, gravity=False, accretion=True)
+                    return s1 + s2
+
             q = quantity
             i = self.patches.index(patch)
 
