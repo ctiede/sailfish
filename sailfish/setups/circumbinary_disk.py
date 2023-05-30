@@ -402,7 +402,7 @@ class AdiabaticParamSweep(SetupBase):
     mach_number_final  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
     end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...")
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
-    which_diagnostics  = param("forces", "output diagnostics option [kitp|forces]")
+    which_diagnostics  = param("kitp", "output diagnostics option [kitp|forces]")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -539,6 +539,8 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="power" , which_mass="both", gravity=True, radial_cut=(1.0, self.domain_radius)),
                 dict(quantity="spin"  , which_mass=1, accretion=True),
                 dict(quantity="spin"  , which_mass=2, accretion=True),
+                dict(quantity="angular_momentum"),
+                dict(quantity="buffer_angular_momentum", buffer=True),
             ]
 
     @property

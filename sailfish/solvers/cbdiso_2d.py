@@ -137,6 +137,41 @@ class Patch:
             )
         return cons_rate[ng:-ng, ng:-ng]
 
+    def buffer_source_term(self):
+        """
+        Return an array of the rates of conserved quantities, resulting from
+        the application of the buffer source terms near the outer boundary
+        """
+        ng = 2
+        m1, m2 = self.physics.point_masses(self.time)
+        buffer_central_mass = m1.mass + m2.mass
+
+        with self.execution_context:
+            conserved1 = self.xp.zeros_like(self.conserved0)
+            cons_rate  = self.xp.zeros_like(self.conserved0)
+
+            self.lib.cbdiso_2d_primitive_to_conserved[self.shape](
+                self.primitive1,
+                conserved1,
+            )
+
+            self.lib.cbdiso_2d_buffer_source_term[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                self.buffer_surface_density,
+                buffer_central_mass,
+                self.physics.buffer_driving_rate,
+                self.buffer_outer_radius,
+                self.physics.buffer_onset_width,
+                int(self.physics.buffer_is_enabled),
+                int(self.retrograde),
+                conserved1,
+                cons_rate,
+            )
+        return cons_rate[ng:-ng, ng:-ng]
+
     def maximum_wavespeed(self):
         """
         Return the maximum wavespeed over a given patch.
@@ -379,10 +414,12 @@ class Solver(SolverBase):
         udots2_acc = [p.point_mass_source_term(2, accretion=True) for p in self.patches]
         udots1_grv = [p.point_mass_source_term(1, gravity=True) for p in self.patches]
         udots2_grv = [p.point_mass_source_term(2, gravity=True) for p in self.patches]
+        udots1_buf = [p.buffer_source_term() for p in self.patches]
+        udots2_buf = [p.buffer_source_term() for p in self.patches]
         da = self.mesh.dx * self.mesh.dy
         ng = self.num_guard
 
-        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False):
+        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False, buffer=False):
             """
             Return one of the udot fields: for a particular patch, conserved
             variable quantity, radial cut (optional), and point mass (either
@@ -434,6 +471,11 @@ class Solver(SolverBase):
                 vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
                 vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
                 return sigma * (x * vy - y * vx)
+
+            if quantity == "buffer_angular_momentum":
+                dpx = get_field(patch, 1, cut, mass, buffer=True)
+                dpy = get_field(patch, 2, cut, mass, buffer=True)
+                return x * dpy - y * dpx
 
             if quantity == "mass":
                 sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
@@ -490,6 +532,9 @@ class Solver(SolverBase):
             elif mass == 2:
                 f = udots2[i][..., q]
 
+            if buffer:
+                f = udots1_buf[i][..., q] + udots2_buf[i][..., q]
+
             return apply_radial_cut(f)
 
         def get_sum_fields(d):
@@ -503,6 +548,7 @@ class Solver(SolverBase):
                         d.which_mass,
                         gravity=d.gravity,
                         accretion=d.accretion,
+                        buffer=d.buffer,
                     )
                     result.append(f.sum())
             return result
