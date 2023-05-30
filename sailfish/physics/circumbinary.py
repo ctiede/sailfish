@@ -32,6 +32,9 @@ class Diagnostic(NamedTuple):
     accretion: bool = False
     """ Whether to include the accretion term (if applicable) """
 
+    buffer: bool = False
+    """ Whether to include the buffer sources (if applicable) """
+
     which_mass: Union[int, str] = None
     """ 1, 2, or 'both' """
 
