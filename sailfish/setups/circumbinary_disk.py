@@ -605,11 +605,11 @@ class EccentricSingleDisk(SetupBase):
 
 
 class UltraThinDisk(SetupBase):
-    mach_number         = param(100.0, "disk mach number (inverse of disk scale height)")
+    mach_number         = param(50.0, "disk mach number (inverse of disk scale height)")
     eccentricity        = 0.0
     mass_ratio          = 1.0
-    sink_radius         = param(0.025, "characteristic size of the sink region around each component", mutable=True)
-    softening_length    = param(0.025, "gravitational softening around point masses", mutable=True)
+    sink_radius         = param(0.03, "characteristic size of the sink region around each component", mutable=True)
+    softening_length    = param(0.03, "gravitational softening around point masses", mutable=True)
     nu                  = param(0.002, "constant value of disk viscosity", mutable=True)
     alpha               = param(0.0, "alpha viscosity parameter--is used if > 0", mutable=True)
     single_point_mass   = param(False, "put one point mass at the origin (no binary)")
@@ -680,6 +680,8 @@ class UltraThinDisk(SetupBase):
             dict(quantity="torque", which_mass="both", accretion=True),
             dict(quantity="sigma_m1"),
             dict(quantity="eccentricity_vector", radial_cut=(1.0, 6.0)),
+            dict(quantity="angular_momentum"),
+            dict(quantity="buffer_angular_momentum", buffer=True),
         ]
 
     @property
