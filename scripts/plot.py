@@ -315,6 +315,7 @@ def main_cbdiso_2d():
             pngname = filename.replace(".pk", ".png")
             print(pngname)
             fig.savefig(pngname, dpi=400)
+            plt.close()
     if not args.save:
         plt.show()
 
