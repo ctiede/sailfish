@@ -415,8 +415,7 @@ class Solver(SolverBase):
         udots2_acc = [p.point_mass_source_term(2, accretion=True) for p in self.patches]
         udots1_grv = [p.point_mass_source_term(1, gravity=True) for p in self.patches]
         udots2_grv = [p.point_mass_source_term(2, gravity=True) for p in self.patches]
-        udots1_buf = [p.buffer_source_term() for p in self.patches]
-        udots2_buf = [p.buffer_source_term() for p in self.patches]
+        udots_buff = [p.buffer_source_term() for p in self.patches]
         da = self.mesh.dx * self.mesh.dy
         ng = self.num_guard
 
@@ -481,9 +480,9 @@ class Solver(SolverBase):
                 return sigma * (x * vy - y * vx)
 
             if quantity == "buffer_angular_momentum":
-                dpx = get_field(patch, 1, cut, mass, buffer=True)
-                dpy = get_field(patch, 2, cut, mass, buffer=True)
-                return x * dpy - y * dpx
+                pdot_x = get_field(patch, 1, cut, mass, buffer=True)
+                pdot_y = get_field(patch, 2, cut, mass, buffer=True)
+                return x * pdot_y - y * pdot_x
 
             if quantity == "mass":
                 sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
@@ -521,7 +520,7 @@ class Solver(SolverBase):
                 f = udots2[i][..., q]
 
             if buffer:
-                f = udots1_buf[i][..., q] + udots2_buf[i][..., q]
+                f = udots_buff[i][..., q]
 
             return apply_radial_cut(f)
 
