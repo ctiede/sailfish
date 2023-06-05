@@ -612,8 +612,8 @@ class UltraThinDisk(SetupBase):
     softening_length    = param(0.03, "gravitational softening around point masses", mutable=True)
     nu                  = param(0.002, "constant value of disk viscosity", mutable=True)
     alpha               = param(0.0, "alpha viscosity parameter--is used if > 0", mutable=True)
+    sink_model          = param("torque_free", "sink [acceleration_free|force_free|torque_free|central_excision]", mutable=True)
     single_point_mass   = param(False, "put one point mass at the origin (no binary)")
-    sink_model          = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
     domain_radius       = param(15.0, "half side length of the square computational domain")
     sink_rate           = param(8.0, "component sink rate", mutable=True)
     buffer_is_enabled   = param(True, "whether the buffer zone is enabled")
@@ -653,7 +653,7 @@ class UltraThinDisk(SetupBase):
         # vr_eq   = -3 / 2. * nu / r_softened * exp(-((5 / r) ** 12))
         vr_pert = 1e-2 * y * exp(-((r / 3.5) ** 6))
 
-        primitive[0] = sigma0 * sigma * jdot_term * cavity + delta0
+        primitive[0] = sigma0 #* sigma * jdot_term * cavity + delta0
         primitive[1] = omega * -y + (vr_eq + vr_pert) * x / r
         primitive[2] = omega * +x + (vr_eq + vr_pert) * y / r
 
