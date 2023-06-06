@@ -283,7 +283,7 @@ class KitpCodeComparison(SetupBase):
                     gravity=True,
                     radial_cut=(1.0, self.domain_radius),
                 ),
-                dict(quantity="sigma_m1"),
+                dict(quantity="sigma_moment", moment=1),
                 dict(quantity="eccentricity_vector", radial_cut=(1.0, 6.0)),
             ]
         elif self.which_diagnostics == "forces":
@@ -530,8 +530,8 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="torque", which_mass="both", accretion=True),
                 dict(quantity="power", which_mass="both", gravity  =True),
                 dict(quantity="power", which_mass="both", accretion=True),
-                dict(quantity="mass"               , radial_cut=(1.0, 4.0)),
-                dict(quantity="sigma_m1"           , radial_cut=(1.0, 4.0)),
+                dict(quantity="mass"        ),
+                dict(quantity="sigma_moment", moment=1, radial_cut=(1.0, 10.0)),
                 dict(quantity="eccentricity_vector", radial_cut=(1.0, 4.0)),
                 dict(quantity="torque", which_mass="both", gravity=True, radial_cut=(0.0, 1.0)),
                 dict(quantity="torque", which_mass="both", gravity=True, radial_cut=(1.0, self.domain_radius)),
@@ -541,6 +541,10 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="spin"  , which_mass=2, accretion=True),
                 dict(quantity="angular_momentum"),
                 dict(quantity="buffer_angular_momentum", buffer=True),
+                dict(quantity="sigma_moment", moment=2, radial_cut=(1.0, 10.0)),
+                dict(quantity="sigma_moment", moment=3, radial_cut=(1.0, 10.0)),
+                dict(quantity="sigma_moment", moment=4, radial_cut=(1.0, 10.0)),
+                dict(quantity="sigma_moment", moment=0, radial_cut=(1.0, 10.0)),
             ]
 
     @property

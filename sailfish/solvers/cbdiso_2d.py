@@ -419,7 +419,7 @@ class Solver(SolverBase):
         da = self.mesh.dx * self.mesh.dy
         ng = self.num_guard
 
-        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False, buffer=False):
+        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False, buffer=False, moment=1):
             """
             Return one of the udot fields: for a particular patch, conserved
             variable quantity, radial cut (optional), and point mass (either
@@ -449,11 +449,17 @@ class Solver(SolverBase):
                 fy = get_field(patch, 2, cut, mass, gravity, accretion)
                 return x * fy - y * fx
 
-            if quantity == "sigma_m1":
+            if quantity == "sigma_moment":
                 sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
-                cos_phi = x / r
-                sin_phi = y / r
-                return sigma * (cos_phi + 1.0j * sin_phi)
+                if moment == 1:
+                    cos_phi = x / r
+                    sin_phi = y / r
+                    return sigma * (cos_phi + 1.0j * sin_phi)
+                else:
+                    # check if moment is positive integer
+                    import numpy as np
+                    phi = np.arctan2(y, x)
+                    return sigma * (np.cos(moment * phi) + 1.0j * np.sin(moment * phi))
 
             if quantity == "eccentricity_vector":
                 sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
@@ -549,6 +555,7 @@ class Solver(SolverBase):
                         gravity=d.gravity,
                         accretion=d.accretion,
                         buffer=d.buffer,
+                        moment=d.moment,
                     )
                     result.append(f.sum())
             return result

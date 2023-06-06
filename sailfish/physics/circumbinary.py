@@ -40,6 +40,9 @@ class Diagnostic(NamedTuple):
     radial_cut: tuple = None
     """ None is ok, or a radial annulus to include e.g. (1.0, 2.0) """
 
+    moment: int = 0
+    """ 0, 1, 2, 3, ... for calculating the mth aziimuthal density moment """
+
 
 class PointMass(NamedTuple):
     r"""
