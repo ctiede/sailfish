@@ -4,7 +4,8 @@ import argparse
 import pickle
 import sys
 
-sys.path.insert(1, ".")
+# sys.path.insert(1, "/Users/ctiede/Research/sailfish")
+sys.path.insert(1, "/home/cwt271/sailfish-up-to-date")
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -149,7 +150,10 @@ def main_cbdiso_2d():
         "sigma": lambda p: p[:, :, 0],
         "vx": lambda p: p[:, :, 1],
         "vy": lambda p: p[:, :, 2],
-        "torque": None,
+        "torque" : None,
+        "jadvect": None,
+        "gradp-r": None,
+        "gradp-p": None,
     }
 
     parser = argparse.ArgumentParser()
@@ -199,6 +203,12 @@ def main_cbdiso_2d():
         default=None,
         type=float,
         help="plot the domain out to this radius",
+    )
+    parser.add_argument(
+        "--circle",
+        default=None,
+        type=float,
+        help="draw a circle at given radius",
     )
     parser.add_argument(
         "--save",
@@ -251,13 +261,82 @@ def main_cbdiso_2d():
             t2 = x * fy2 - y * fx2
             t = t1 + t2
             print("total torque:", t.sum())
-            return np.abs(t) ** 0.125 * np.sign(t)
+            # return np.abs(t) ** 0.125 * np.sign(t)
+            return t
+
+    class PressureGradients:
+        def __init__(self, mesh, masses, mach_number, direction):
+            self.mesh = mesh 
+            self.masses = masses
+            self.direction = direction
+            self.mach_number = mach_number
+
+        def __call__(self, primitive):
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            dx = mesh.dx
+            dy = mesh.dy
+            da = dx * dy
+            x  = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y  = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            
+            m1  = self.masses[0].mass
+            m2  = self.masses[1].mass
+            x1  = self.masses[0].position_x
+            y1  = self.masses[0].position_y
+            x2  = self.masses[1].position_x
+            y2  = self.masses[1].position_y
+            rs1 = self.masses[0].softening_length
+            rs2 = self.masses[1].softening_length
+
+            sigma = primitive[:, :, 0]
+            delx1 = x - x1
+            dely1 = y - y1
+            delx2 = x - x2
+            dely2 = y - y2
+
+            phi1 = -m1 / (delx1**2 + dely1**2 + rs1**2) ** 0.5
+            phi2 = -m2 / (delx2**2 + dely2**2 + rs2**2) ** 0.5
+            cs2 = -(phi1 + phi2) / self.mach_number ** 2
+            p = sigma * cs2
+            dpx = -np.gradient(p, dx, axis=0) * da
+            dpy = -np.gradient(p, dy, axis=1) * da
+            if self.direction == 'r':
+                dp = (x * dpx + y * dpy) / np.sqrt(x * x + y * y)
+            elif self.direction == 'phi':
+                dp = x * dpy - y * dpx
+            else:
+                print('invalid pressure gradient direction')
+            return np.abs(dp) ** 0.125 * np.sign(dp)
+            # return dp
+
+    class AdvectedAngularMomentum:
+        def __init__(self, mesh):
+            self.mesh = mesh
+
+        def __call__(self, primitive):
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            x  = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y  = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            da = mesh.dx * mesh.dy
+            sig = primitive[:, :, 0]
+            vx  = primitive[:, :, 1]
+            vy  = primitive[:, :, 2]
+            delv2 = vy * vy - vx * vx
+            delx2 =  x *  x -  y *  y
+            j = sig * da * (x * y * delv2 + vx * vy * delx2) / np.sqrt(x * x + y * y)
+            return j
+            # return np.abs(j) ** 0.125 * np.sign(j)
 
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
-        fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
+        fields["torque" ] = TorqueCalculation(mesh, chkpt["point_masses"])
+        fields["gradp-r"] = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'r')
+        fields["gradp-p"] = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'phi')
+        fields["jadvect"] = AdvectedAngularMomentum(mesh)
 
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
@@ -301,6 +380,11 @@ def main_cbdiso_2d():
             # Eq. 1 in Franchini & Martin (2019; https://arxiv.org/pdf/1908.02776.pdf)
             r_res = 3 ** (-2 / 3) * (1 + q) ** (-1 / 3) * a
             ax.plot(x, y, ls="--", lw=0.75, c="w", alpha=1.0)
+
+        if args.circle is not None:
+            c = plt.Circle((0., 0.), args.circle, color='r', fill=False)
+            ax.scatter([-0.5, 0.5], [0., 0.], s=8, color='cyan')
+            ax.add_artist(c)
 
         ax.set_aspect("equal")
         if args.radius is not None:
