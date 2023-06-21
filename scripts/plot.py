@@ -4,8 +4,8 @@ import argparse
 import pickle
 import sys
 
-# sys.path.insert(1, "/Users/ctiede/Research/sailfish")
-sys.path.insert(1, "/home/cwt271/sailfish-up-to-date")
+sys.path.insert(1, "/Users/ctiede/Research/sailfish")
+# sys.path.insert(1, "/home/cwt271/sailfish-up-to-date")
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -150,10 +150,11 @@ def main_cbdiso_2d():
         "sigma": lambda p: p[:, :, 0],
         "vx": lambda p: p[:, :, 1],
         "vy": lambda p: p[:, :, 2],
-        "torque" : None,
-        "jadvect": None,
-        "gradp-r": None,
-        "gradp-p": None,
+        "torque"  : None,
+        "jadvect" : None,
+        "jspecific": None,
+        "gradp-r" : None,
+        "gradp-p" : None,
     }
 
     parser = argparse.ArgumentParser()
@@ -262,7 +263,7 @@ def main_cbdiso_2d():
             t = t1 + t2
             print("total torque:", t.sum())
             # return np.abs(t) ** 0.125 * np.sign(t)
-            return t
+            return t / da
 
     class PressureGradients:
         def __init__(self, mesh, masses, mach_number, direction):
@@ -329,14 +330,30 @@ def main_cbdiso_2d():
             return j
             # return np.abs(j) ** 0.125 * np.sign(j)
 
+    class SpecificAngularMomentum:
+        def __init__(self, mesh):
+            self.mesh = mesh
+
+        def __call__(self, primitive):
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            x  = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y  = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            r  = np.sqrt(x * x + y * y)
+            da = mesh.dx * mesh.dy
+            vx = primitive[:, :, 1]
+            vy = primitive[:, :, 2]
+            return (x * vy - y * vx) - (x * x + y * y) ** 0.25
+
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
-        fields["torque" ] = TorqueCalculation(mesh, chkpt["point_masses"])
-        fields["gradp-r"] = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'r')
-        fields["gradp-p"] = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'phi')
-        fields["jadvect"] = AdvectedAngularMomentum(mesh)
+        fields["torque" ]  = TorqueCalculation(mesh, chkpt["point_masses"])
+        fields["gradp-r"]  = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'r')
+        fields["gradp-p"]  = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'phi')
+        fields["jadvect"]  = AdvectedAngularMomentum(mesh)
+        fields["jspecific"] = SpecificAngularMomentum(mesh)
 
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
@@ -396,7 +413,7 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         if args.save:
-            pngname = filename.replace(".pk", ".png")
+            pngname = filename.split('/')[-1].replace(".pk", ".png")
             print(pngname)
             fig.savefig(pngname, dpi=400)
             plt.close()
