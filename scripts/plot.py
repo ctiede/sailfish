@@ -3,7 +3,8 @@ import pickle
 import sys
 import cmasher as cmr
 
-sys.path.insert(1, "/Users/ctiede/Research/sailfish")
+# sys.path.insert(1, "/Users/ctiede/Research/sailfish")
+sys.path.insert(1, "/groups/astro/ctiede/sailfish-sweep")
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -214,6 +215,11 @@ def main_cbdiso_2d():
         action="store_true",
     )
     parser.add_argument(
+        "--velocity-vectors",
+        '-v',
+        action="store_true",
+    )
+    parser.add_argument(
         "--as-pdf",
         '-pdf',
         action="store_true",
@@ -322,6 +328,16 @@ def main_cbdiso_2d():
             fig.suptitle('t={:.2f} orbits  :   e={:.3f}   q={:.3f} '.format(chkpt['time'] / 2. / np.pi, orbital_state.eccentricity, orbital_state.mass_ratio))
         else:
             fig.suptitle(filename)
+
+        if args.velocity_vectors:
+            mesh = chkpt['mesh']
+            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(mesh.ni)])[:, None]
+            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(mesh.nj)])[None, :]
+            vx = fields["vx"](prim).T
+            vy = fields["vy"](prim).T
+            xx, yy = np.meshgrid(x, y)
+            skip = (slice(None, None, int(mesh.ni / 300)),) * 2
+            ax.quiver(xx[skip], yy[skip], vx[skip], vy[skip], alpha=0.5, color='cyan', scale=80, headwidth=2, headlength=4)
 
         ax.set_aspect("equal")
         if args.radius is not None:

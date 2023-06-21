@@ -400,7 +400,7 @@ class AdiabaticParamSweep(SetupBase):
     mass_ratio_final   = param(1.0 , "component mass ratio at end of sweep")
     mach_number_init   = param(10.0, "orbital Mach number (isothermal) at start of sweep")
     mach_number_final  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
-    end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...")
+    end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...", mutable=True) #dumb, just be smart
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
     which_diagnostics  = param("kitp", "output diagnostics option [kitp|forces]")
 
