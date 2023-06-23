@@ -330,7 +330,7 @@ def main_cbdiso_2d():
             return j
             # return np.abs(j) ** 0.125 * np.sign(j)
 
-    class SpecificAngularMomentum:
+    class SpecificAngularMomentumSurplus:
         def __init__(self, mesh):
             self.mesh = mesh
 
@@ -353,7 +353,7 @@ def main_cbdiso_2d():
         fields["gradp-r"]  = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'r')
         fields["gradp-p"]  = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'phi')
         fields["jadvect"]  = AdvectedAngularMomentum(mesh)
-        fields["jspecific"] = SpecificAngularMomentum(mesh)
+        fields["jspecific"] = SpecificAngularMomentumSurplus(mesh)
 
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
@@ -400,7 +400,10 @@ def main_cbdiso_2d():
 
         if args.circle is not None:
             c = plt.Circle((0., 0.), args.circle, color='r', fill=False)
-            ax.scatter([-0.5, 0.5], [0., 0.], s=8, color='cyan')
+            p1 = chkpt["point_masses"][0]
+            p2 = chkpt["point_masses"][1]
+            # ax.scatter([-0.5, 0.5], [0., 0.], s=8, color='cyan')
+            ax.scatter([p1.position_x, p2.position_x], [p1.position_y, p2.position_y], s=8, color='cyan')
             ax.add_artist(c)
 
         ax.set_aspect("equal")
