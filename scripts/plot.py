@@ -150,6 +150,7 @@ def main_cbdiso_2d():
         "sigma": lambda p: p[:, :, 0],
         "vx": lambda p: p[:, :, 1],
         "vy": lambda p: p[:, :, 2],
+        "pressure": None,
         "torque"  : None,
         "jadvect" : None,
         "jspecific": None,
@@ -265,6 +266,40 @@ def main_cbdiso_2d():
             # return np.abs(t) ** 0.125 * np.sign(t)
             return t / da
 
+    class Pressure:
+        def __init__(self, mesh, masses, mach_number):
+            self.mesh = mesh 
+            self.masses = masses
+            self.mach_number = mach_number
+
+        def __call__(self, primitive):
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            x  = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y  = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            
+            m1  = self.masses[0].mass
+            m2  = self.masses[1].mass
+            x1  = self.masses[0].position_x
+            y1  = self.masses[0].position_y
+            x2  = self.masses[1].position_x
+            y2  = self.masses[1].position_y
+            rs1 = self.masses[0].softening_length
+            rs2 = self.masses[1].softening_length
+
+            sigma = primitive[:, :, 0]
+            delx1 = x - x1
+            dely1 = y - y1
+            delx2 = x - x2
+            dely2 = y - y2
+
+            phi1 = -m1 / (delx1**2 + dely1**2 + rs1**2) ** 0.5
+            phi2 = -m2 / (delx2**2 + dely2**2 + rs2**2) ** 0.5
+            cs2 = -(phi1 + phi2) / self.mach_number ** 2
+            p = sigma * cs2
+            return p
+            # return np.abs(p) ** 0.125 * np.sign(p)
+
     class PressureGradients:
         def __init__(self, mesh, masses, mach_number, direction):
             self.mesh = mesh 
@@ -308,8 +343,8 @@ def main_cbdiso_2d():
                 dp = x * dpy - y * dpx
             else:
                 print('invalid pressure gradient direction')
-            return np.abs(dp) ** 0.125 * np.sign(dp)
-            # return dp
+            # return np.abs(dp * self.mach_number**2) ** 0.125 * np.sign(dp)
+            return dp 
 
     class AdvectedAngularMomentum:
         def __init__(self, mesh):
@@ -349,11 +384,30 @@ def main_cbdiso_2d():
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
+        fields["pressure" ]  = Pressure(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'])
         fields["torque" ]  = TorqueCalculation(mesh, chkpt["point_masses"])
         fields["gradp-r"]  = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'r')
         fields["gradp-p"]  = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'phi')
         fields["jadvect"]  = AdvectedAngularMomentum(mesh)
         fields["jspecific"] = SpecificAngularMomentumSurplus(mesh)
+
+        clabel = r'$\Sigma$'
+        if args.field == 'pressure':
+            clabel = r'$P$'
+        elif args.field == 'torque':
+            clabel = 'torque'
+        elif args.field == 'gradp-r':
+            clabel = r'$(\nabla P)_r$'
+            # clabel = r'$(\nabla P)_r \cdot \mathcal{M}^2$')
+        elif args.field == 'gradp-p':
+            clabel = r'$(\nabla P)_\phi$'
+            # clabel = r'$(\nabla P)_\phi \cdot \mathcal{M}^2$'
+        elif args.field == 'jadvect':
+            clabel = r'$j_{\rm adv}$'
+        elif args.field == 'jspecific':
+            clabel = r'$j - j_{\rm kep}$'
+        else:
+            clabel=None
 
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
@@ -410,7 +464,7 @@ def main_cbdiso_2d():
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
-        fig.colorbar(cm)
+        fig.colorbar(cm, label=clabel)
         fig.suptitle(filename)
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
