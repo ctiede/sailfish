@@ -403,6 +403,7 @@ class AdiabaticParamSweep(SetupBase):
     end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...", mutable=True) #dumb, just be smart
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
     which_diagnostics  = param("kitp", "output diagnostics option [kitp|forces]")
+    ell0               = param(0.0 , "initial guess for angular momentum current in the CBD; ell0!=0 will initialize with a cavity")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -424,11 +425,20 @@ class AdiabaticParamSweep(SetupBase):
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
         phi_hat_x = -y / max(r, 1e-12)
         phi_hat_y = +x / max(r, 1e-12)
+        
+        sigma0 = self.initial_sigma
+        if self.ell0 == 0.0:
+            sigma = sigma0
+        else:
+            f_cavity  = exp(-((2.5 / r) ** 12))
+            j_current = 1 - self.ell0 / sqrt(r)
+            sigma = sigma0 * j_current * f_cavity + 1e-8
+
         if self.retrograde == True:
                 sign = -1.
 
         if self.is_isothermal:
-            primitive[0] = self.initial_sigma
+            primitive[0] = sigma
             primitive[1] = sqrt(GM / r_softened) * phi_hat_x * sign
             primitive[2] = sqrt(GM / r_softened) * phi_hat_y * sign
 
@@ -446,6 +456,7 @@ class AdiabaticParamSweep(SetupBase):
                 * r_softened ** (-3.0 / 2.0)
                 * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
             )
+
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
