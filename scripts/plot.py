@@ -335,16 +335,16 @@ def main_cbdiso_2d():
             phi2 = -m2 / (delx2**2 + dely2**2 + rs2**2) ** 0.5
             cs2 = -(phi1 + phi2) / self.mach_number ** 2
             p = sigma * cs2
-            dpx = -np.gradient(p, dx, axis=0) * da
-            dpy = -np.gradient(p, dy, axis=1) * da
+            dpx = -np.gradient(p, dx, axis=0)# * da
+            dpy = -np.gradient(p, dy, axis=1)# * da
             if self.direction == 'r':
                 dp = (x * dpx + y * dpy) / np.sqrt(x * x + y * y)
             elif self.direction == 'phi':
                 dp = x * dpy - y * dpx
             else:
                 print('invalid pressure gradient direction')
-            # return np.abs(dp * self.mach_number**2) ** 0.125 * np.sign(dp)
-            return dp 
+            # return np.abs(dp / sigma) ** 0.125 * np.sign(dp / sigma)
+            return dp / sigma
 
     class AdvectedAngularMomentum:
         def __init__(self, mesh):
