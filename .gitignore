@@ -3,3 +3,4 @@ __pycache__
 /data
 /doc/source/_autosummary
 /doc/build
+/test
