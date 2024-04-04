@@ -223,8 +223,10 @@ class Physics(NamedTuple):
         if isinstance(masses, tuple) or isinstance(masses, list):
             if len(masses) == 1:
                 return masses[0], PointMass()
-            if len(masses) == 2:
+            if len(masses) in [2, 3]: # TODO Should be checking if this consistent with solver
                 return masses
+
+
 
         raise ValueError(
             "point_mass_function returned an unsupported description of point masses"

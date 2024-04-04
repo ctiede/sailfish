@@ -26,6 +26,7 @@ def make_solver(name, physics, options, **kwargs):
     from . import cbdgam_2d
     from . import cbdiso_2d
     from . import cbdisodg_2d
+    from . import cbdplanet_iso2d
 
     solvers = dict(
         srhd_1d=srhd_1d,
@@ -34,6 +35,7 @@ def make_solver(name, physics, options, **kwargs):
         cbdgam_2d=cbdgam_2d,
         cbdiso_2d=cbdiso_2d,
         cbdisodg_2d=cbdisodg_2d,
+        cbdplanet_iso2d=cbdplanet_iso2d,
     )
     for ext_name in __solver_extension_modules:
         solvers[ext_name] = import_module(ext_name)

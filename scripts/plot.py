@@ -589,6 +589,8 @@ def main_cbdiso_2d():
 def main_cbdisodg_2d():
     main_cbdiso_2d()
 
+def main_cbdplanet_iso2d():
+    main_cbdiso_2d()
 
 def main_cbdgam_2d():
     import matplotlib.pyplot as plt
@@ -675,6 +677,9 @@ if __name__ == "__main__":
             if chkpt["solver"] == "cbdisodg_2d":
                 print("plotting for cbdisodg_2d solver")
                 exit(main_cbdisodg_2d())
+            if chkpt["solver"] == "cbdplanet_iso2d":
+                print("plotting for cbdplanet_iso2d solver")
+                exit(main_cbdplanet_iso2d())
             if chkpt["solver"] == "cbdgam_2d":
                 print("plotting for cbdgam_2d solver")
                 exit(main_cbdgam_2d())
