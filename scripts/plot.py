@@ -221,6 +221,14 @@ def main_cbdiso_2d():
         "--draw-lindblad31-radius",
         action="store_true",
     )
+    parser.add_argument(
+        "--box",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--spiral",
+        action="store_true"
+    )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
@@ -380,6 +388,26 @@ def main_cbdiso_2d():
             vy = primitive[:, :, 2]
             return (x * vy - y * vx) - (x * x + y * y) ** 0.25
 
+    class Vortensity:
+        def __init__(self, mesh):
+            self.mesh = mesh
+
+        def __call__(self, primitive):
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            dx = mesh.dx
+            dy = mesh.dy
+            da = dx * dy
+            x  = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y  = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            sigma = primitive[:, :, 0]
+            velx  = primitive[:, :, 1]
+            vely  = primitive[:, :, 2]
+            dvxdy = np.gradient(velx, dy, axis=1)
+            dvydx = np.gradient(vely, dx, axis=0)
+            vorticity = dvydx - dvxdy
+            return vorticity / sigma
+
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
@@ -390,6 +418,7 @@ def main_cbdiso_2d():
         fields["gradp-p"]  = PressureGradients(mesh, chkpt["point_masses"], chkpt['model_parameters']['mach_number'], 'phi')
         fields["jadvect"]  = AdvectedAngularMomentum(mesh)
         fields["jspecific"] = SpecificAngularMomentumSurplus(mesh)
+        fields["vortensity"] = Vortensity(mesh)
 
         clabel = r'$\Sigma$'
         if args.field == 'pressure':
@@ -440,6 +469,62 @@ def main_cbdiso_2d():
             extent=extent,
         )
 
+        # adding the box
+        if args.box:
+            dr = 0.05
+            ni, nj = mesh.shape
+            xx  = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
+            yy  = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
+            xline = np.where((yy < 1.01) & (yy > 0.99))[0][0]
+            # ax.scatter(xx[xline], 1 * np.ones(x/x[xline].shape))
+            # ax.scatter(xx, 1 * np.ones(xx.shape))
+            sig = prim[:, :, 0].T
+
+            import matplotlib.patches as patches
+            def find_nearest(array, value):
+                array = np.asarray(array)
+                idx = (np.abs(array - value)).argmin()
+                return array[idx]
+            
+            xb0 = -2.0
+            xb1 = -0.75
+            yb0 = 0.3
+            dby  = 1e-6
+            rect = patches.Rectangle((xb0, yb0), xb1 - xb0, dby, linewidth=1, edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+
+            X, Y = np.meshgrid(xx, yy)
+            idx = np.abs(Y[:,0] - yb0).argmin()
+            xline = X[idx]
+            xcut  = (xline > xb0) & (xline < xb1)
+            sline = sig[idx][xcut]
+            np.save('x100-acc.npy', xline[xcut])
+            np.save('s100-acc.npy', sline)
+
+
+            # ybox = (Y > yb0) & (Y < yb1)
+            # box  = xbox & ybox
+            # sig0 = sig[box]
+            # np.save('x60-acc.npy', X[box])
+            # np.save('s60-acc.npy', sig0)
+            # print(sig0.shape)
+            # ax.pcolormesh(X[box].flat, Y[box].flat, sig0.flat)
+
+
+            # # r  = np.sqrt(xx * xx + yy * yy)
+            # # p  = np.arctan2(yy, xx)
+            # # rbox = (r > 1.5 - dr) & (r < 1.5 + dr)
+            # # phib = (p < np.pi) & (p > np.pi / 2.)
+            # xxb = xx[np.where((rbox)&(phib)),:]
+            # yyb = yy[:,np.where((rbox)&(phib))]
+            # print(xxb.shape)
+            # print(yyb.shape)
+            # X, Y = np.meshgrid(x[(rbox)], y[(rbox)])
+            # xxb = X[xbox]
+            # yyb = Y[xbox]
+            # ax.pcolormesh(xxb , yyb, np.ones(np.shape(xxb)))
+
+
         if args.draw_lindblad31_radius:
             x1 = chkpt["point_masses"][0].position_x
             y1 = chkpt["point_masses"][0].position_y
@@ -459,6 +544,29 @@ def main_cbdiso_2d():
             # ax.scatter([-0.5, 0.5], [0., 0.], s=8, color='cyan')
             ax.scatter([p1.position_x, p2.position_x], [p1.position_y, p2.position_y], s=8, color='cyan')
             ax.add_artist(c)
+
+            ra = 1.5
+            # phia = -1.8 
+            phia = -2.78 
+            # phia = -0.73
+            ax.arrow(0, 0, ra * np.cos(phia), ra * np.sin(phia), head_width=0.1, color='C3')
+
+        if args.spiral:
+            # mach = chkpt['model_parameters']['mach_number']
+            mach = 3.5
+            def Archimedean(x, m, phase):
+                c = 2 * np.pi / m
+                return [c * x, 2 * np.pi * x + phase]
+            x = np.linspace(0, mach, 1000)
+            r1, p1 = Archimedean(x, mach,  np.pi / 2)
+            r2, p2 = Archimedean(x, mach, -np.pi / 2)
+            x1 = r1 * np.cos(p1)
+            x2 = r2 * np.cos(p2)
+            y1 = -r1 * np.sin(p1)
+            y2 = -r2 * np.sin(p2)
+            plt.plot(x1, y1, color='aqua', ls='--')
+            plt.plot(x2, y2, color='fuchsia', ls='--')
+
 
         ax.set_aspect("equal")
         if args.radius is not None:
