@@ -1,6 +1,7 @@
 from pickle import load, dump
 from sys import path, argv
 from pathlib import Path
+import argparse
 
 path.append(str(Path(__file__).parent.parent))
 
@@ -12,7 +13,7 @@ def scale_by_n(infile, n):
     c["solution"] = c["solution"].repeat(n, axis=0).repeat(n, axis=1)
     c["driver"] = c["driver"]._replace(resolution=c["driver"].resolution * n)
     c["mesh"] = c["mesh"]._replace(ni=c["mesh"].ni * n, nj=c["mesh"].nj * n)
-    outfile = infile.replace(".pk", "_upsampled.pk")
+    outfile = infile.replace(".pk", ".u{:d}x.pk".format(n))
 
     with open(outfile, "wb") as f:
         dump(c, f)
@@ -21,7 +22,9 @@ def scale_by_n(infile, n):
 
 
 if __name__ == "__main__":
-    if len(argv) < 2:
-        print("No files provided, use 'python3 upsample.py file1 file2 ...'")
-    for file in argv[1:]:
-        scale_by_n(file, 2)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("checkpoints", type=str, nargs="+")
+    parser.add_argument("--factor", '-n', type=int, default=2)
+    args = parser.parse_args()
+    for file in args.checkpoints:
+        scale_by_n(file, args.factor)
