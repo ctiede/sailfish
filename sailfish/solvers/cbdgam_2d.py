@@ -23,7 +23,7 @@ logger = getLogger(__name__)
 class Options(NamedTuple):
     pressure_floor: float = 1e-12
     density_floor: float = 1e-10
-    velocity_ceiling: float = 1e16
+    velocity_ceiling: float = 10.
     mach_ceiling: float = 1e5
 
 

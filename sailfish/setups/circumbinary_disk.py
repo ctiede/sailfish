@@ -12,6 +12,7 @@ from sailfish.physics.circumbinary import (
 )
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.setup_base import SetupBase, SetupError, param
+from sailfish.physics.cooling import compute_cooling_coefficient
 
 
 class CircumbinaryDisk(SetupBase):
@@ -387,13 +388,14 @@ class AdiabaticParamSweep(SetupBase):
     sink_model          = param("torque_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
     initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
     initial_pressure    = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
-    cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
+    # cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
     alpha               = param(0.0, "alpha-viscosity parameter (gamma-law)")
     nu                  = param(0.001, "kinematic viscosity parameter (isothermal)")
     constant_softening  = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index     = param(5.0 / 3.0, "adiabatic index (gamma-law)")
     retrograde          = param(False, "is disk retrograde?")
     
+    # For parameter sweeping
     eccentricity_init  = param(0.0 , "orbital eccentricity at start of sweep")
     eccentricity_final = param(0.0 , "orbital eccentricity at end of sweep"  )
     mass_ratio_init    = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
@@ -404,6 +406,10 @@ class AdiabaticParamSweep(SetupBase):
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
     which_diagnostics  = param("kitp", "output diagnostics option [kitp|forces]")
     ell0               = param(0.0 , "initial guess for angular momentum current in the CBD; ell0!=0 will initialize with a cavity")
+
+    # For calculating blackbody cooling coefficient
+    binary_mass       = param(1e6, "total mass of the binary in solar masses")
+    binary_separation = param(1e-3, "inital binary separation in parsec")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -446,17 +452,16 @@ class AdiabaticParamSweep(SetupBase):
             # See eq. (A2) from Goodman (2003)
             primitive[0] = (
                 self.initial_sigma
-                * r_softened ** (-3.0 / 5.0)
-                * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+                 * r_softened ** (-3.0 / 5.0)
+                 * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
             )
             primitive[1] = sqrt(GM / r_softened) * phi_hat_x
             primitive[2] = sqrt(GM / r_softened) * phi_hat_y
             primitive[3] = (
                 self.initial_pressure
-                * r_softened ** (-3.0 / 2.0)
-                * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+                 * r_softened ** (-3.0 / 2.0)
+                 * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
             )
-
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -493,9 +498,9 @@ class AdiabaticParamSweep(SetupBase):
                 gamma_law_index=self.gamma_law_index,
                 point_mass_function=self.point_masses,
                 buffer_is_enabled=self.buffer_is_enabled,
-                buffer_driving_rate=1000.0,  # default value in circumbinary.py
-                buffer_onset_width=0.1,  # default value in circumbinary.py
-                cooling_coefficient=self.cooling_coefficient,
+                buffer_driving_rate=1000.0,  
+                buffer_onset_width=0.1,
+                cooling_coefficient=compute_cooling_coefficient(self.binary_mass, self.binary_separation),
                 constant_softening=self.constant_softening,
                 viscosity_model=ViscosityModel.CONSTANT_ALPHA
                 if self.alpha > 0.0
@@ -508,7 +513,13 @@ class AdiabaticParamSweep(SetupBase):
 
     @property
     def diagnostics(self):
-        if self.which_diagnostics == "forces":
+        if self.eos == "gamma-law":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+            ]
+        elif self.which_diagnostics == "forces":
             return [
                 dict(quantity="time"),
                 dict(quantity="mass-ratio"),
@@ -557,6 +568,8 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="sigma_moment", moment=4, radial_cut=(1.0, 10.0)),
                 dict(quantity="sigma_moment", moment=0, radial_cut=(1.0, 10.0)),
             ]
+        else:
+            return []
 
     @property
     def solver(self):
