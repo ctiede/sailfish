@@ -404,6 +404,12 @@ def main_cbdgam_2d():
         help="maximum value for colormap",
     )
     parser.add_argument(
+        "--radius",
+        default=None,
+        type=float,
+        help="plot the domain out to this radius",
+    )
+    parser.add_argument(
         "--save",
         action="store_true",
         help="save PNG files instead of showing a window",
@@ -431,7 +437,13 @@ def main_cbdgam_2d():
             extent=extent,
         )
         ax.set_aspect("equal")
+        if args.radius is not None:
+            ax.set_xlim(-args.radius, args.radius)
+            ax.set_ylim(-args.radius, args.radius)
         fig.colorbar(cm)
+        fig.subplots_adjust(
+            left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
+        )
         fig.suptitle(filename)
 
         if args.save:
