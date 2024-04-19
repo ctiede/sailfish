@@ -404,7 +404,7 @@ class AdiabaticParamSweep(SetupBase):
     mach_number_final  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
     end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...", mutable=True) #dumb, just be smart
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
-    which_diagnostics  = param("kitp", "output diagnostics option [kitp|forces]")
+    which_diagnostics  = param("kitp", "output diagnostics option [kitp|forces|simple]")
     ell0               = param(0.0 , "initial guess for angular momentum current in the CBD; ell0!=0 will initialize with a cavity")
 
     # For calculating blackbody cooling coefficient
@@ -513,21 +513,19 @@ class AdiabaticParamSweep(SetupBase):
 
     @property
     def diagnostics(self):
-        if self.eos == "gamma-law":
+        if self.which_diagnostics == "simple":
             return [
                 dict(quantity="time"),
                 dict(quantity="mdot", which_mass=1, accretion=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="angular_momentum"),
+                dict(quantity="buffer_angular_momentum", buffer=True),
             ]
         elif self.which_diagnostics == "forces":
             return [
                 dict(quantity="time"),
                 dict(quantity="mass-ratio"),
                 dict(quantity="eccentricity"),
-                dict(quantity="power" , which_mass="both", gravity  =True),
-                dict(quantity="power" , which_mass="both", accretion=True),
-                dict(quantity="torque", which_mass="both", gravity  =True),
-                dict(quantity="torque", which_mass="both", accretion=True),
                 dict(quantity="mdot", which_mass=1, accretion=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
                 dict(quantity="fx"  , which_mass=1, gravity  =True),
@@ -545,28 +543,19 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="time"),
                 dict(quantity="mass-ratio"),
                 dict(quantity="eccentricity"),
-                dict(quantity="mach-number"),
+                dict(quantity="angular_momentum"),
+                dict(quantity="buffer_angular_momentum", buffer=True),
                 dict(quantity="mdot", which_mass=1, accretion=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
                 dict(quantity="torque", which_mass="both", gravity  =True),
                 dict(quantity="torque", which_mass="both", accretion=True),
                 dict(quantity="power", which_mass="both", gravity  =True),
                 dict(quantity="power", which_mass="both", accretion=True),
-                dict(quantity="mass"        ),
+                dict(quantity="spin" , which_mass=1, accretion=True),
+                dict(quantity="spin" , which_mass=2, accretion=True),
                 dict(quantity="sigma_moment", moment=1, radial_cut=(1.0, 10.0)),
                 dict(quantity="eccentricity_vector", radial_cut=(1.0, 4.0)),
-                dict(quantity="torque", which_mass="both", gravity=True, radial_cut=(0.0, 1.0)),
-                dict(quantity="torque", which_mass="both", gravity=True, radial_cut=(1.0, self.domain_radius)),
-                dict(quantity="power" , which_mass="both", gravity=True, radial_cut=(0.0, 1.0)),
-                dict(quantity="power" , which_mass="both", gravity=True, radial_cut=(1.0, self.domain_radius)),
-                dict(quantity="spin"  , which_mass=1, accretion=True),
-                dict(quantity="spin"  , which_mass=2, accretion=True),
-                dict(quantity="angular_momentum"),
-                dict(quantity="buffer_angular_momentum", buffer=True),
-                dict(quantity="sigma_moment", moment=2, radial_cut=(1.0, 10.0)),
-                dict(quantity="sigma_moment", moment=3, radial_cut=(1.0, 10.0)),
-                dict(quantity="sigma_moment", moment=4, radial_cut=(1.0, 10.0)),
-                dict(quantity="sigma_moment", moment=0, radial_cut=(1.0, 10.0)),
+                dict(quantity="mass"),
             ]
         else:
             return []

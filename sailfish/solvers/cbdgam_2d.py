@@ -391,6 +391,55 @@ class Solver(SolverBase):
                 ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
                 return sigma * (ex + 1.0j * ey)
 
+            if quantity == "angular_momentum":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                return sigma * (x * vy - y * vx)
+
+            if quantity == "buffer_angular_momentum":
+                dpx = get_field(patch, 1, cut, mass, buffer=True)
+                dpy = get_field(patch, 2, cut, mass, buffer=True)
+                return x * dpy - y * dpx
+
+            if quantity == "mass":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                return sigma
+
+            if quantity == "power":
+                fx = get_field(patch, 1, cut, mass, gravity, accretion)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                if mass == 1:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    vx1, vy1 = m1.velocity_x, m1.velocity_y
+                    return vx1 * fx + vy1 * fy
+                elif mass == 2:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    vx2, vy2 = m2.velocity_x, m2.velocity_y
+                    return vx2 * fx + vy2 * fy
+                elif mass == 'both':
+                    p1 = get_field(patch, "power", cut, 1, gravity, accretion)
+                    p2 = get_field(patch, "power", cut, 2, gravity, accretion)
+                    return p1 + p2
+                # else:
+                #     raise ValueError("Mass option for 'power' must be 1 or 2.")
+
+            if quantity == "spin":
+                fx = get_field(patch, 1, cut, mass, gravity=False, accretion=True)
+                fy = get_field(patch, 2, cut, mass, gravity=False, accretion=True)
+                if mass == 1:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    x1, y1 = m1.position_x, m1.position_y
+                    return (x - x1) * fy - (y - y1) * fx
+                elif mass == 2:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    x2, y2 = m2.position_x, m2.position_y
+                    return (x - x2) * fy - (y - y2) * fx
+                elif mass == 'both':
+                    s1 = get_field(patch, "spin", cut, 1, gravity=False, accretion=True)
+                    s2 = get_field(patch, "spin", cut, 2, gravity=False, accretion=True)
+                    return s1 + s2
+
             q = quantity
             i = self.patches.index(patch)
 
