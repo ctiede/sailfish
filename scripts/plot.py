@@ -403,6 +403,11 @@ def main_cbdgam_2d():
         type=float,
         help="maximum value for colormap",
     )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="save PNG files instead of showing a window",
+    )
 
     args = parser.parse_args()
 
@@ -429,7 +434,14 @@ def main_cbdgam_2d():
         fig.colorbar(cm)
         fig.suptitle(filename)
 
-    plt.show()
+        if args.save:
+            pngname = filename.replace(".pk", ".png")
+            print(pngname)
+            fig.savefig(pngname, dpi=400)
+            plt.close()
+
+    if not args.save:
+        plt.show()
 
 
 if __name__ == "__main__":
