@@ -12,7 +12,7 @@ from sailfish.physics.circumbinary import (
 )
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.setup_base import SetupBase, SetupError, param
-from sailfish.physics.cooling import compute_cooling_coefficient
+from sailfish.physics.cooling import ShakuraSunyaevDisk
 
 
 class CircumbinaryDisk(SetupBase):
@@ -389,10 +389,11 @@ class AdiabaticParamSweep(SetupBase):
     initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
     initial_pressure    = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
     # cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
-    alpha               = param(0.0, "alpha-viscosity parameter (gamma-law)")
+    alpha               = param(0.1, "alpha-viscosity parameter (gamma-law)")
     nu                  = param(0.001, "kinematic viscosity parameter (isothermal)")
     constant_softening  = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index     = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    single_point_mass   = param(False, "put one point mass at the origin (no binary)")
     retrograde          = param(False, "is disk retrograde?")
     
     # For parameter sweeping
@@ -410,6 +411,7 @@ class AdiabaticParamSweep(SetupBase):
     # For calculating blackbody cooling coefficient
     binary_mass       = param(1e6, "total mass of the binary in solar masses")
     binary_separation = param(1e-3, "inital binary separation in parsec")
+    mach_at_3a        = param(10.,  "Mach number at r=3a")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -449,19 +451,30 @@ class AdiabaticParamSweep(SetupBase):
             primitive[2] = sqrt(GM / r_softened) * phi_hat_y * sign
 
         elif self.is_gamma_law:
-            # See eq. (A2) from Goodman (2003)
-            primitive[0] = (
-                self.initial_sigma
-                 * r_softened ** (-3.0 / 5.0)
-                 * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
-            )
+            # # See eq. (A2) from Goodman (2003)
+            # primitive[0] = (
+            #     self.initial_sigma
+            #      * r_softened ** (-3.0 / 5.0)
+            #      * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+            # )
+            # primitive[1] = sqrt(GM / r_softened) * phi_hat_x
+            # primitive[2] = sqrt(GM / r_softened) * phi_hat_y
+            # primitive[3] = (
+            #     self.initial_pressure
+            #      * r_softened ** (-3.0 / 2.0)
+            #      * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+            # )
+            ss = ShakuraSunyaevDisk(
+                    central_mass_msun=self.binary_mass, 
+                    length_scale_pc=self.binary_separation,
+                    mach_number_3a=self.mach_at_3a,
+                    alpha=self.alpha,
+                )
+            fcavity = 0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30))
+            primitive[0] = ss.surface_density_profile(r_softened) * fcavity
+            primitive[3] = ss.surface_pressure_profile(r_softened) * fcavity
             primitive[1] = sqrt(GM / r_softened) * phi_hat_x
             primitive[2] = sqrt(GM / r_softened) * phi_hat_y
-            primitive[3] = (
-                self.initial_pressure
-                 * r_softened ** (-3.0 / 2.0)
-                 * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
-            )
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -493,6 +506,12 @@ class AdiabaticParamSweep(SetupBase):
             )
 
         elif self.is_gamma_law:
+            ss = ShakuraSunyaevDisk(
+                    central_mass_msun=self.binary_mass, 
+                    length_scale_pc=self.binary_separation,
+                    mach_number_3a=self.mach_at_3a,
+                    alpha=self.alpha
+                    )
             return dict(
                 eos_type=EquationOfState.GAMMA_LAW,
                 gamma_law_index=self.gamma_law_index,
@@ -500,7 +519,7 @@ class AdiabaticParamSweep(SetupBase):
                 buffer_is_enabled=self.buffer_is_enabled,
                 buffer_driving_rate=1000.0,  
                 buffer_onset_width=0.1,
-                cooling_coefficient=compute_cooling_coefficient(self.binary_mass, self.binary_separation),
+                cooling_coefficient=ss.cooling_coefficient(),
                 constant_softening=self.constant_softening,
                 viscosity_model=ViscosityModel.CONSTANT_ALPHA
                 if self.alpha > 0.0
@@ -518,8 +537,8 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="time"),
                 dict(quantity="mdot", which_mass=1, accretion=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
-                dict(quantity="angular_momentum"),
-                dict(quantity="buffer_angular_momentum", buffer=True),
+                # dict(quantity="angular_momentum"),
+                # dict(quantity="buffer_angular_momentum", buffer=True),
             ]
         elif self.which_diagnostics == "forces":
             return [
@@ -607,25 +626,33 @@ class AdiabaticParamSweep(SetupBase):
         )
 
     def point_masses(self, time):
-        m1, m2 = self.orbital_elements(time).orbital_state(time)
+        if self.single_point_mass:
+            return PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                mass=1.0,
+            )
+        else:
+            m1, m2 = self.orbital_elements(time).orbital_state(time)
 
-        return (
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
-                sink_radius=self.sink_radius,
-                **m1._asdict(),
-            ),
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
-                sink_radius=self.sink_radius,
-                **m2._asdict(),
-            ),
-        )
+            return (
+                PointMass(
+                    softening_length=self.softening_length,
+                    sink_model=SinkModel[self.sink_model.upper()],
+                    sink_rate=self.sink_rate,
+                    sink_radius=self.sink_radius,
+                    **m1._asdict(),
+                ),
+                PointMass(
+                    softening_length=self.softening_length,
+                    sink_model=SinkModel[self.sink_model.upper()],
+                    sink_rate=self.sink_rate,
+                    sink_radius=self.sink_radius,
+                    **m2._asdict(),
+                ),
+            )
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
-
