@@ -3,6 +3,7 @@ Code to compute the cooling coefficient for blackbody radiation
 around a binary with given mass and semi-major axis
 """
 
+from logging import getLogger
 from typing import NamedTuple
 from math import sqrt
 
@@ -17,6 +18,8 @@ cgs = dict(
 		pc = 3.085678e18,
 		msun = 1.989e33,
 	)
+
+logger = getLogger(__name__)
 
 class ShakuraSunyaevDisk(NamedTuple):
 	"""The central mass, length scale (e.g. binary separation), alpha, and mach number (at r=3a)
@@ -105,14 +108,17 @@ class ShakuraSunyaevDisk(NamedTuple):
 		return self._surface_density / (self._mass / self._length**2)
 
 	@property
-	def surface_pressure_coefficient(self, r:float) -> float:
-		return self._surface_pressure / (self._mass / self._time**2)
+	def surface_pressure_coefficient(self) -> float:
+		return self._surface_pressure / (self._mass / self._time**2)	
 
 	def surface_density_profile(self, r:float) -> float:
 		return self.surface_density_coefficient * r**(-3./5.)
 
 	def surface_pressure_profile(self, r:float) -> float:
 		return self.surface_pressure_coefficient * r**(-3./2.)
+
+	def optical_depth(self, r:float) -> float:
+		return cgs['kappa'] * self._surface_density * r**(-3./5.)
 
 	# -------------------------------------------------------------------------
 	def cooling_coefficient(self, gamma:float=5./3.) -> float:
@@ -130,7 +136,15 @@ class ShakuraSunyaevDisk(NamedTuple):
 		kb_code = cgs['kb'] / (self._mass * self._length**2 / self._time**2)
 		kappa_code  = cgs['kappa'] / (self._length**2 / self._mass)
 		sigmab_code = cgs['sigmab'] / (self._mass / self._time**3)	
-		return 8. / 3. * sigmab_code * (mp_code / kb_code)**4 * (gamma - 1.)**4 / kappa_code
+		qdot_coeff = 8. / 3. * sigmab_code * (mp_code / kb_code)**4 * (gamma - 1.)**4 / kappa_code
+
+		logger.info(f"density coefficient : {self.surface_density_coefficient:0.2e}")
+		logger.info(f"pressure coefficient : {self.surface_pressure_coefficient:0.2e}")
+		logger.info(f"implied eddington fraction : {self._eddington_fraction:0.2e}")
+		logger.info(f"approximate optical depth : {self.optical_depth(1.):0.4f}")
+		logger.info(f"cooling coefficient : {qdot_coeff:0.2e}")
+
+		return qdot_coeff
 
 	# Only for temporary testing
 	# =============================================================================
@@ -257,29 +271,31 @@ if __name__ == '__main__':
 	ss = ShakuraSunyaevDisk(
         	central_mass_msun=8e6, 
         	length_scale_pc=9.7e-4,
-        	mach_number_3a=21.0,
+        	mach_number_3a=21,
         	alpha=0.1,
         )
 	print("fedd : ", ss._eddington_fraction)
-	fcavity = 0.0001 + 0.9999 * np.exp(-((1.0 / r) ** 30))
 
-	fig, [ax1, ax2, ax3] = plt.subplots(3, 1)
+	fcavity = 0.0001 + 0.9999 * np.exp(-((1.0 / r) ** 30))
+	fig, [ax1, ax2, ax3] = plt.subplots(3, 1, sharex=True)
 	ax1.plot(r, ss.surface_density_profile(r) * fcavity, c='C0')
 	ax1.plot(r, ss.surface_density_goodman() / (ss._mass / ss._length**2) * r**(-3./5.) * fcavity, c='C1', ls='--')
 	ax1.plot(r, 0.057 * r**(-3./5.) * fcavity, c='C3')
 
 	ax2.plot(r, ss.surface_pressure_profile(r) * fcavity, c='C0')
 	ax2.plot(r, ss.surface_pressure_goodman() / (ss._mass / ss._time**2) * r**(-3./2.) * fcavity, c='C1', ls='--')
-	ax2.plot(r, 6.7e-5 * r**(-3./2.) * fcavity, c='C3')
+	ax2.plot(r, pi * 6.7e-5 * r**(-3./2.) * fcavity, c='C3')
 
 	ax3.plot(r, ss.surface_pressure_profile(r) / ss.surface_density_profile(r), c='C0')
 	ax3.plot(r, 6.7e-5 * r**(-3./2.) / (0.057 * r**(-3./5.)), c='C3')
 
-	ax2.set_xlabel(r'$r$')
 	ax1.set_ylabel(r'$\Sigma$')
 	ax2.set_ylabel(r'$P$')
 	ax3.set_ylabel(r'$c_s^2$')
+	ax3.set_xlabel(r'$r$')
 
+	plt.tight_layout()
+	plt.subplots_adjust(hspace=0.1)
 	plt.show()
 
 
