@@ -136,14 +136,12 @@ class ShakuraSunyaevDisk(NamedTuple):
 		kb_code = cgs['kb'] / (self._mass * self._length**2 / self._time**2)
 		kappa_code  = cgs['kappa'] / (self._length**2 / self._mass)
 		sigmab_code = cgs['sigmab'] / (self._mass / self._time**3)	
-		qdot_coeff = 8. / 3. * sigmab_code * (mp_code / kb_code)**4 * (gamma - 1.)**4 / kappa_code
-
+		qdot_coeff = 8. / 3. * sigmab_code / kappa_code * (mp_code / kb_code)**4 * (gamma - 1.)**4
 		logger.info(f"density coefficient : {self.surface_density_coefficient:0.2e}")
 		logger.info(f"pressure coefficient : {self.surface_pressure_coefficient:0.2e}")
 		logger.info(f"implied eddington fraction : {self._eddington_fraction:0.2e}")
 		logger.info(f"approximate optical depth : {self.optical_depth(1.):0.4f}")
 		logger.info(f"cooling coefficient : {qdot_coeff:0.2e}")
-
 		return qdot_coeff
 
 	# Only for temporary testing
@@ -267,7 +265,7 @@ if __name__ == '__main__':
 	import numpy as np
 	import matplotlib.pyplot as plt
 
-	r = np.linspace(0.5, 20., 250)
+	r = np.linspace(0.5, 10., 250)
 	ss = ShakuraSunyaevDisk(
         	central_mass_msun=8e6, 
         	length_scale_pc=9.7e-4,
@@ -277,7 +275,7 @@ if __name__ == '__main__':
 	print("fedd : ", ss._eddington_fraction)
 
 	fcavity = 0.0001 + 0.9999 * np.exp(-((1.0 / r) ** 30))
-	fig, [ax1, ax2, ax3] = plt.subplots(3, 1, sharex=True)
+	fig, [ax1, ax2, ax3] = plt.subplots(3, 1, sharex=True, figsize=[5,8])
 	ax1.plot(r, ss.surface_density_profile(r) * fcavity, c='C0')
 	ax1.plot(r, ss.surface_density_goodman() / (ss._mass / ss._length**2) * r**(-3./5.) * fcavity, c='C1', ls='--')
 	ax1.plot(r, 0.057 * r**(-3./5.) * fcavity, c='C3')

@@ -471,7 +471,8 @@ class AdiabaticParamSweep(SetupBase):
                     alpha=self.alpha,
                 )
             fcavity = 0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30))
-            primitive[0] = ss.surface_density_profile(r_softened) * fcavity
+            jcorrect = 1 - self.ell0 / sqrt(r_softened)
+            primitive[0] = ss.surface_density_profile(r_softened) * fcavity * jcorrect
             primitive[3] = ss.surface_pressure_profile(r_softened) * fcavity
             primitive[1] = sqrt(GM / r_softened) * phi_hat_x
             primitive[2] = sqrt(GM / r_softened) * phi_hat_y

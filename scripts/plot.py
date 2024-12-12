@@ -3,8 +3,8 @@ import pickle
 import sys
 import cmasher as cmr
 
-# sys.path.insert(1, "/Users/ctiede/Research/sailfish")
-sys.path.insert(1, "/groups/astro/ctiede/sailfish-sweep")
+sys.path.insert(1, "/Users/ctiede/Research/sailfish")
+# sys.path.insert(1, "/groups/astro/ctiede/sailfish")
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -178,6 +178,12 @@ def main_cbdiso_2d():
         help="scale the field by the given power",
     )
     parser.add_argument(
+        "--scale-by-radius",
+        default=None,
+        type=float,
+        help="scale the field by 1 / r to given power",
+    )
+    parser.add_argument(
         "--vmin",
         default=None,
         type=float,
@@ -204,6 +210,18 @@ def main_cbdiso_2d():
         "--save",
         action="store_true",
         help="save PNG files instead of showing a window",
+    )
+    parser.add_argument(
+        "--no-frame",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--fix-edges",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--draw-binary",
+        action="store_true",
     )
     parser.add_argument(
         "--draw-lindblad31-radius",
@@ -241,7 +259,7 @@ def main_cbdiso_2d():
             x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
             y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
 
-            x1 = self.masses[0].position_x
+            x1 = self[0].position_x
             y1 = self.masses[0].position_y
             x2 = self.masses[1].position_x
             y2 = self.masses[1].position_y
@@ -288,9 +306,28 @@ def main_cbdiso_2d():
 
         f = fields[args.field](prim).T
 
+        if args.fix_edges:
+            ni, nj = mesh.shape
+            dx = mesh.dx
+            dy = mesh.dy
+            da = dx * dy
+            dr = chkpt['model_parameters']['domain_radius']
+            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None].T
+            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :].T
+            r = np.sqrt(x * x + y * y)
+            f[r > dr-0.1] = np.nan
+
         if args.print_model_parameters:
             print(chkpt["model_parameters"])
 
+        if args.scale_by_radius is not None:
+            x1 = chkpt["point_masses"][0].position_x - x
+            y1 = chkpt["point_masses"][0].position_y - y
+            x2 = chkpt["point_masses"][1].position_x - x
+            y2 = chkpt["point_masses"][1].position_y - y
+            r1 = np.sqrt(x1 * x1 + y1 * y1 + 0.05**2)
+            r2 = np.sqrt(x2 * x2 + y2 * y2 + 0.05**2)
+            f = f / r1**args.scale_by_radius + f / r2**args.scale_by_radius
         if args.scale_by_power is not None:
             f = f**args.scale_by_power
         if args.log:
@@ -305,6 +342,13 @@ def main_cbdiso_2d():
             cmap=args.cmap,
             extent=extent,
         )
+
+        if args.draw_binary:
+            x1 = chkpt["point_masses"][0].position_x
+            y1 = chkpt["point_masses"][0].position_y
+            x2 = chkpt["point_masses"][1].position_x
+            y2 = chkpt["point_masses"][1].position_y
+            ax.scatter([x1, x2], [y1, y2], s=0.1, c='k',)
 
         if args.draw_lindblad31_radius:
             x1 = chkpt["point_masses"][0].position_x
@@ -327,7 +371,8 @@ def main_cbdiso_2d():
             orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
             fig.suptitle('t={:.2f} orbits  :   e={:.3f}   q={:.3f} '.format(chkpt['time'] / 2. / np.pi, orbital_state.eccentricity, orbital_state.mass_ratio))
         else:
-            fig.suptitle(filename)
+            if args.no_frame == False:
+                fig.suptitle(filename)
 
         if args.velocity_vectors:
             mesh = chkpt['mesh']
@@ -343,17 +388,20 @@ def main_cbdiso_2d():
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
-        fig.colorbar(cm)
-        fig.subplots_adjust(
-            left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
-        )
+        if args.no_frame:
+            ax.axis('off')
+        else:
+            fig.colorbar(cm)
+            fig.subplots_adjust(
+                left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
+            )
         if args.save:
             if args.as_pdf:
                 pngname = filename.replace(".pk", ".pdf")
             else:
                 pngname = filename.replace(".pk", ".png")
             print(pngname)
-            fig.savefig(pngname, dpi=400)
+            fig.savefig(pngname, dpi=400, pad_inches=0.0 if args.no_frame else 0.5, bbox_inches='tight', transparent=True if args.no_frame else False)
             plt.close()
     if not args.save:
         plt.show()
