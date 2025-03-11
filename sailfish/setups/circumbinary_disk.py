@@ -470,12 +470,21 @@ class AdiabaticParamSweep(SetupBase):
                     mach_number_3a=self.mach_at_3a,
                     alpha=self.alpha,
                 )
-            fcavity = 0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30))
-            jcorrect = 1 - self.ell0 / sqrt(r_softened)
-            primitive[0] = ss.surface_density_profile(r_softened) * fcavity * jcorrect
+            q = self.mass_ratio_init
+            rcav = 2.5
+            sigma = ss.surface_density_profile(r_softened)
+            dpdr = -3. / 2. * ss.surface_pressure_coefficient * r_softened**(-5. / 2.)
+            qquad =  1. / 4. * q / (1. + q)**2 * (1. +  3. / 2. * self.eccentricity_init**2) * (not self.single_point_mass)
+            vphi2 =  GM / r_softened * (1. + 3. * qquad / r_softened**2) + r_softened / sigma * dpdr
+            fcavity = 0.0001 + 0.9999 * exp(-((1.0 / rcav) ** 30)) if (not self.single_point_mass) else 1.0
+            jcorrect = 1. - self.ell0 / sqrt(r_softened)
+
+            primitive[0] = sigma * fcavity * jcorrect
+            primitive[1] = sqrt(vphi2) * phi_hat_x
+            primitive[2] = sqrt(vphi2) * phi_hat_y
             primitive[3] = ss.surface_pressure_profile(r_softened) * fcavity
-            primitive[1] = sqrt(GM / r_softened) * phi_hat_x
-            primitive[2] = sqrt(GM / r_softened) * phi_hat_y
+            # primitive[1] = sqrt(GM / r_softened) * phi_hat_x
+            # primitive[2] = sqrt(GM / r_softened) * phi_hat_y
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
