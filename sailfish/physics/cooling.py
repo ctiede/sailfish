@@ -67,8 +67,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 		"""
 		f0 = 10.2604 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**0.5
 		rm = 3 * self._length
-		return (f0 * self.alpha**0.5 * self._GM**(7./4.) * rm**(-1./4.) * self.mach_number_3a**-5
-		           / self._eddington_rate)
+		return f0 * self.alpha**0.5 * self._GM**(7./4.) * rm**(-1./4.) * self.mach_number_3a**-5 / self._eddington_rate
 	
 	@property
 	def _accretion_rate(self) -> float:
@@ -102,6 +101,16 @@ class ShakuraSunyaevDisk(NamedTuple):
 		t0 = 0.394035 * (cgs['mp'] * cgs['kappa'] / cgs['kb'] / cgs['sigmab'])**(1./5.)
 		return t0 * self.alpha**(-1./5.) * self._GM**(3./10.) * self._accretion_rate**(2./5.) * self._length**(-9./10.)
 
+	@property
+	def _mach_number(self) -> float:
+		"""Disk Mach number profile (dimensionless)
+
+		   Mach = 2^(1/2) * (pi^2 / 3)^(1/10) * (mp / kb)^(2/5) * (sigmab / kappa)^(1/10) * alpha^(1/10) * (GM)^(7/20) * Mdot^(-1/5) * r^(1/20)
+		"""
+		m0 = 1.593063 * (cgs['mp'] / cgs['kb'])**(2./5.) * (cgs['sigmab'] / cgs['kappa'])**(1./10.)
+		return m0 * self.alpha**(1./10.) * self._GM**(7./20.) * self._accretion_rate**(-1./5.) * self._length**(-1./20.)
+	
+
 	# -------------------------------------------------------------------------
 	@property
 	def surface_density_coefficient(self) -> float:
@@ -119,6 +128,13 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 	def optical_depth(self, r:float) -> float:
 		return cgs['kappa'] * self._surface_density * r**(-3./5.)
+
+	def mach_number_profile(self, r:float) -> float:
+		return self._mach_number * r**(-1./20.)
+
+	def viscous_time(self, r:float) -> float:
+		mach = self.mach_number_profile(r)
+		return 3./2. * self.alpha / mach**2 * r**(-3./2.)
 
 	# -------------------------------------------------------------------------
 	def cooling_coefficient(self, gamma:float=5./3.) -> float:
