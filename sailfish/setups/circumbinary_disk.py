@@ -388,6 +388,7 @@ class AdiabaticParamSweep(SetupBase):
     sink_model          = param("torque_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
     initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
     initial_pressure    = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
+    cavity_radius       = param(2.5 , "radius of the cavity in initial profiles")
     # cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
     alpha               = param(0.1, "alpha-viscosity parameter (gamma-law)")
     nu                  = param(0.001, "kinematic viscosity parameter (isothermal)")
@@ -428,30 +429,46 @@ class AdiabaticParamSweep(SetupBase):
 
     def primitive(self, t, coords, primitive):
         GM = 1.0
-        sign = 1.0
+        rcav = self.cavity_radius
+        delt = 1e-5
+        sign = 1.0 if (not self.retrograde) else -1.0
         x, y = coords
         r = sqrt(x * x + y * y)
+        j_current = 1 - self.ell0 / sqrt(r)
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
-        phi_hat_x = -y / max(r, 1e-12)
-        phi_hat_y = +x / max(r, 1e-12)
-        
-        sigma0 = self.initial_sigma
-        if self.ell0 == 0.0:
-            sigma = sigma0
-        else:
-            f_cavity  = exp(-((2.5 / r) ** 12))
-            j_current = 1 - self.ell0 / sqrt(r)
-            sigma = sigma0 * j_current * f_cavity + 1e-8
-
-        if self.retrograde == True:
-                sign = -1.
+        cavity = delt + (1. - delt) * exp(-((rcav / r) ** 12)) #if (not self.single_point_mass) else 1.0
+        phi_hat_x = -y / max(r, 1e-12) * sign
+        phi_hat_y = +x / max(r, 1e-12) * sign
 
         if self.is_isothermal:
+            sigma0 = self.initial_sigma
+            if self.ell0 == 0.0:
+                sigma = sigma0
+            else:
+                sigma = sigma0 * j_current * cavity
             primitive[0] = sigma
-            primitive[1] = sqrt(GM / r_softened) * phi_hat_x * sign
-            primitive[2] = sqrt(GM / r_softened) * phi_hat_y * sign
+            primitive[1] = sqrt(GM / r_softened) * phi_hat_x
+            primitive[2] = sqrt(GM / r_softened) * phi_hat_y
 
         elif self.is_gamma_law:
+            ss = ShakuraSunyaevDisk(
+                    central_mass_msun=self.binary_mass, 
+                    length_scale_pc=self.binary_separation,
+                    mach_number_a=self.mach_at_a,
+                    # mach_number_3a=self.mach_at_3a,
+                    alpha=self.alpha,
+                )
+            q = self.mass_ratio_init
+            sigma = ss.surface_density_profile(r_softened)
+            dpdr  = -3. / 2. * ss.surface_pressure_coefficient * r_softened**(-5. / 2.)
+            qquad =  1. / 4. * q / (1. + q)**2 * (1. +  3. / 2. * self.eccentricity_init**2) * (not self.single_point_mass)
+            vphi2 =  GM / r_softened * (1. + 3. * qquad / r_softened**2) + r_softened / sigma * dpdr
+
+            primitive[0] = sigma * j_current * cavity
+            primitive[1] = sqrt(vphi2) * phi_hat_x
+            primitive[2] = sqrt(vphi2) * phi_hat_y
+            primitive[3] = ss.surface_pressure_profile(r_softened) * cavity
+            #
             # # See eq. (A2) from Goodman (2003)
             # primitive[0] = (
             #     self.initial_sigma
@@ -465,27 +482,6 @@ class AdiabaticParamSweep(SetupBase):
             #      * r_softened ** (-3.0 / 2.0)
             #      * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
             # )
-            ss = ShakuraSunyaevDisk(
-                    central_mass_msun=self.binary_mass, 
-                    length_scale_pc=self.binary_separation,
-                    mach_number_3a=self.mach_at_3a,
-                    alpha=self.alpha,
-                )
-            q = self.mass_ratio_init
-            rcav = 2.5
-            sigma = ss.surface_density_profile(r_softened)
-            dpdr = -3. / 2. * ss.surface_pressure_coefficient * r_softened**(-5. / 2.)
-            qquad =  1. / 4. * q / (1. + q)**2 * (1. +  3. / 2. * self.eccentricity_init**2) * (not self.single_point_mass)
-            vphi2 =  GM / r_softened * (1. + 3. * qquad / r_softened**2) + r_softened / sigma * dpdr
-            fcavity = 0.0001 + 0.9999 * exp(-((1.0 / rcav) ** 30)) if (not self.single_point_mass) else 1.0
-            jcorrect = 1. - self.ell0 / sqrt(r_softened)
-
-            primitive[0] = sigma * fcavity * jcorrect
-            primitive[1] = sqrt(vphi2) * phi_hat_x
-            primitive[2] = sqrt(vphi2) * phi_hat_y
-            primitive[3] = ss.surface_pressure_profile(r_softened) * fcavity
-            # primitive[1] = sqrt(GM / r_softened) * phi_hat_x
-            # primitive[2] = sqrt(GM / r_softened) * phi_hat_y
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
