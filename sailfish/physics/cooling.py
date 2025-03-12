@@ -31,8 +31,9 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 	central_mass_msun : float
 	length_scale_pc   : float
-	mach_number_3a    : float
+	mach_number_a     : float
 	alpha             : float
+	# fix_fedd          : int
 
 	# -------------------------------------------------------------------------
 	@property
@@ -66,11 +67,16 @@ class ShakuraSunyaevDisk(NamedTuple):
 		   f_edd = 10.26 * (mp^4 / kb^4 * sigmab / kappa * alpha)^(1/2) * (GM)^(7/4) * Mach(r)^-5 * r^(-1/4) / Mdot_edd
 		"""
 		f0 = 10.2604 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**0.5
-		rm = 3 * self._length
-		return f0 * self.alpha**0.5 * self._GM**(7./4.) * rm**(-1./4.) * self.mach_number_3a**-5 / self._eddington_rate
+		rm = self._length
+		# rm = 3 * self._length
+		return f0 * self.alpha**0.5 * self._GM**(7./4.) * rm**(-1./4.) * self.mach_number_a**-5 / self._eddington_rate
 	
 	@property
 	def _accretion_rate(self) -> float:
+		# if self.fix_fedd > 0.0:
+		# 	return self.fix_fedd * self._eddington_rate
+		# else:
+		# 	return self._eddington_fraction * self._eddington_rate
 		return self._eddington_fraction * self._eddington_rate
 
 	@property
@@ -134,7 +140,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 	def viscous_time(self, r:float) -> float:
 		mach = self.mach_number_profile(r)
-		return 3./2. * self.alpha / mach**2 * r**(-3./2.)
+		return 2. / 3 * mach**2 / self.alpha * r**(3./2.)
 
 	# -------------------------------------------------------------------------
 	def cooling_coefficient(self, gamma:float=5./3.) -> float:
@@ -285,7 +291,7 @@ if __name__ == '__main__':
 	ss = ShakuraSunyaevDisk(
         	central_mass_msun=8e6, 
         	length_scale_pc=9.7e-4,
-        	mach_number_3a=21,
+        	mach_number_a=21,
         	alpha=0.1,
         )
 	print("fedd : ", ss._eddington_fraction)

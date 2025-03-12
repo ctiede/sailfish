@@ -411,7 +411,8 @@ class AdiabaticParamSweep(SetupBase):
     # For calculating blackbody cooling coefficient
     binary_mass       = param(1e6, "total mass of the binary in solar masses")
     binary_separation = param(1e-3, "inital binary separation in parsec")
-    mach_at_3a        = param(10.,  "Mach number at r=3a")
+    mach_at_a         = param(10.,  "Mach number at r=a")
+    # mach_at_3a        = param(10.,  "Mach number at r=3a")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -519,7 +520,8 @@ class AdiabaticParamSweep(SetupBase):
             ss = ShakuraSunyaevDisk(
                     central_mass_msun=self.binary_mass, 
                     length_scale_pc=self.binary_separation,
-                    mach_number_3a=self.mach_at_3a,
+                    mach_number_a=self.mach_at_a,
+                    # mach_number_3a=self.mach_at_3a,
                     alpha=self.alpha
                     )
             return dict(
