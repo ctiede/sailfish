@@ -437,6 +437,8 @@ class AdiabaticParamSweep(SetupBase):
         j_current = 1 - self.ell0 / sqrt(r)
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
         cavity = delt + (1. - delt) * exp(-((rcav / r) ** 12)) #if (not self.single_point_mass) else 1.0
+        r_hat_x   =  x / max(r, 1e-12)
+        r_hat_y   =  y / max(r, 1e-12)
         phi_hat_x = -y / max(r, 1e-12) * sign
         phi_hat_y = +x / max(r, 1e-12) * sign
 
@@ -460,14 +462,17 @@ class AdiabaticParamSweep(SetupBase):
                 )
             q = self.mass_ratio_init
             sigma = ss.surface_density_profile(r_softened)
-            dpdr  = -3. / 2. * ss.surface_pressure_coefficient * r_softened**(-5. / 2.)
-            qquad =  1. / 4. * q / (1. + q)**2 * (1. +  3. / 2. * self.eccentricity_init**2) * (not self.single_point_mass)
-            vphi2 =  GM / r_softened * (1. + 3. * qquad / r_softened**2) + r_softened / sigma * dpdr
+            pressure = ss.surface_pressure_profile(r_softened)
+            nu = self.alpha * pressure / sigma * self.gamma_law_index * sqrt(r_softened**3 / GM)
+            vr = -3. / 2. * nu / r_softened
+            dpdr = -3. / 2. * ss.surface_pressure_coefficient * r_softened**(-5. / 2.)
+            qquad = 1. / 4. * q / (1. + q)**2 * (1. +  3. / 2. * self.eccentricity_init**2) * (not self.single_point_mass)
+            vphi2 = GM / r_softened * (1. + 3. * qquad / r_softened**2) + r_softened / sigma * dpdr
 
             primitive[0] = sigma * j_current * cavity
-            primitive[1] = sqrt(vphi2) * phi_hat_x
-            primitive[2] = sqrt(vphi2) * phi_hat_y
-            primitive[3] = ss.surface_pressure_profile(r_softened) * cavity
+            primitive[1] = sqrt(vphi2) * phi_hat_x + vr * r_hat_x
+            primitive[2] = sqrt(vphi2) * phi_hat_y + vr * r_hat_y
+            primitive[3] = pressure * cavity
             #
             # # See eq. (A2) from Goodman (2003)
             # primitive[0] = (
