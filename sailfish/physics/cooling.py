@@ -53,6 +53,10 @@ class ShakuraSunyaevDisk(NamedTuple):
 		return self._mass * cgs['G']	
 
 	@property
+	def _gamma(self):
+		return 5./3.
+
+	@property
 	def _accretion_efficiency(self):
 		return 0.1
 	
@@ -66,7 +70,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 		   f_edd = 10.26 * (mp^4 / kb^4 * sigmab / kappa * alpha)^(1/2) * (GM)^(7/4) * Mach(r)^-5 * r^(-1/4) / Mdot_edd
 		"""
-		f0 = 10.2604 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**0.5
+		f0 = 10.2604 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**0.5 * self._gamma**(-2.) * (0.5)**(0.5)
 		rm = self._length
 		# rm = 3 * self._length
 		return f0 * self.alpha**0.5 * self._GM**(7./4.) * rm**(-1./4.) * self.mach_number_a**-5 / self._eddington_rate
@@ -86,7 +90,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 		   Sigma = (32 * 3^6 / pi^3)^(1/5) * (mp^4 / kb^4 * sigmab / kappa)^(1/5) 
 		   			* alpha^(-4/5) * (GM)^(1/5) * Mdot^(3/5) * r^(-3/5)
 		"""
-		s0 = 0.269274 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**(1./5.)
+		s0 = 0.269274 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**(1./5.) * self._gamma**(-4./5.) * (0.5)**(1./5.)
 		return s0 * self.alpha**(-4./5.) * self._GM**(1./5.) * self._accretion_rate**(3./5.) * self._length**(-3./5.)
 
 	@property
@@ -95,7 +99,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 		   P = (1 / 3 / pi) * alpha^-1 * Mdot * (GM)^0.5 * r^(-3/2)
 		"""
-		return 0.106103 / self.alpha * self._accretion_rate * sqrt(self._GM) * self._length**(-3./2.)
+		return 0.106103 / self._gamma / self.alpha * self._accretion_rate * sqrt(self._GM) * self._length**(-3./2.)
 
 	@property
 	def _midplane_temperature(self) -> float:
@@ -104,7 +108,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 		   T = (3 / 32 / pi^2)^(1/5) * (mp * kappa / kb / sigmab)^(1/5) 
 		        * alpha^(-1/5) * (GM)^(3/10) * Mdot^(2/5) * r^(-9/10)
 		"""
-		t0 = 0.394035 * (cgs['mp'] * cgs['kappa'] / cgs['kb'] / cgs['sigmab'])**(1./5.)
+		t0 = 0.394035 * (cgs['mp'] * cgs['kappa'] / cgs['kb'] / cgs['sigmab'])**(1./5.) * self._gamma**(-1./5.) * (0.5)**(-1./5.)
 		return t0 * self.alpha**(-1./5.) * self._GM**(3./10.) * self._accretion_rate**(2./5.) * self._length**(-9./10.)
 
 	@property
@@ -113,7 +117,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 		   Mach = 2^(1/2) * (pi^2 / 3)^(1/10) * (mp / kb)^(2/5) * (sigmab / kappa)^(1/10) * alpha^(1/10) * (GM)^(7/20) * Mdot^(-1/5) * r^(1/20)
 		"""
-		m0 = 1.593063 * (cgs['mp'] / cgs['kb'])**(2./5.) * (cgs['sigmab'] / cgs['kappa'])**(1./10.)
+		m0 = 1.593063 * (cgs['mp'] / cgs['kb'])**(2./5.) * (cgs['sigmab'] / cgs['kappa'])**(1./10.) * self._gamma**(-2./5.) * (0.5)**(1./10.)
 		return m0 * self.alpha**(1./10.) * self._GM**(7./20.) * self._accretion_rate**(-1./5.) * self._length**(-1./20.)
 	
 
@@ -143,7 +147,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 		return 2. / 3 * mach**2 / self.alpha * r**(3./2.)
 
 	# -------------------------------------------------------------------------
-	def cooling_coefficient(self, gamma:float=5./3.) -> float:
+	def cooling_coefficient(self) -> float:
 		"""Assumes avg fluid particle mass is the proton mass
 	
 				P / Sigma = eps * (gamma - 1)
@@ -152,13 +156,13 @@ class ShakuraSunyaevDisk(NamedTuple):
 	
 				eps_cooled (dt) = eps * (1 + 3 * cooling_coefficient * Sigma^-2 * eps^3 * dt)^-1/3 
 	
-				cooling_coefficient = 8/3 * sigma_boltz / opacity * (mp / kb) * (gamma - 1)
+				cooling_coefficient = 8/3 * sigma_boltz / opacity * (mp / kb)^4 * (gamma - 1)
 		"""
 		mp_code = cgs['mp'] /  self._mass
 		kb_code = cgs['kb'] / (self._mass * self._length**2 / self._time**2)
 		kappa_code  = cgs['kappa'] / (self._length**2 / self._mass)
 		sigmab_code = cgs['sigmab'] / (self._mass / self._time**3)	
-		qdot_coeff = 8. / 3. * sigmab_code / kappa_code * (mp_code / kb_code)**4 * (gamma - 1.)**4
+		qdot_coeff = 8. / 3. * sigmab_code / kappa_code * (mp_code / kb_code)**4 * (self._gamma - 1.)**4
 		logger.info(f"density coefficient : {self.surface_density_coefficient:0.2e}")
 		logger.info(f"pressure coefficient : {self.surface_pressure_coefficient:0.2e}")
 		logger.info(f"implied eddington fraction : {self._eddington_fraction:0.2e}")

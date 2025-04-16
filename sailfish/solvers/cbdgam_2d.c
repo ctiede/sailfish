@@ -145,9 +145,9 @@ PRIVATE void point_mass_source_term(
     // {
     //     sink_rate = mass->sink_rate * pow(1.0 - pow(dr / r_sink, 2.0), 2.0);
     // }
-    // double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
+    // double sink_rate = (dr < r_sink) ? mass->sink_rate * pow(1.0 - pow(dr / r_sink, 4.0), 2.0) : 0.0; //for testing ss-setup
 
-    double sink_rate = (dr < r_sink) ? mass->sink_rate * pow(1.0 - pow(dr / r_sink, 4.0), 2.0) : 0.0; //for testing ss-setup
+    double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
     double fgrav_numerator = sigma * mass->mass * pow(r2 + r_soft * r_soft, -1.5);
     double fx = -fgrav_numerator * dx;
     double fy = -fgrav_numerator * dy;
