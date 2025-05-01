@@ -457,21 +457,22 @@ class AdiabaticParamSweep(SetupBase):
                     central_mass_msun=self.binary_mass, 
                     length_scale_pc=self.binary_separation,
                     mach_number_a=self.mach_at_a,
-                    # mach_number_3a=self.mach_at_3a,
                     alpha=self.alpha,
-                )
+                    gamma=self.gamma_law_index,
+                 )
             q = self.mass_ratio_init
             sigma = ss.surface_density_profile(r_softened)
             pressure = ss.surface_pressure_profile(r_softened)
             nu = self.alpha * pressure / sigma * self.gamma_law_index * sqrt(r_softened**3 / GM)
-            vr = -3. / 2. * nu / r_softened
+            vrnu = -3. / 2. * nu / r_softened
             dpdr = -3. / 2. * ss.surface_pressure_coefficient * r_softened**(-5. / 2.)
             qquad = 1. / 4. * q / (1. + q)**2 * (1. +  3. / 2. * self.eccentricity_init**2) * (not self.single_point_mass)
             vphi2 = GM / r_softened * (1. + 3. * qquad / r_softened**2) + r_softened / sigma * dpdr
+            vrpert = 1e-3 * y * exp(-((r / 3.5) ** 6)) if (not self.single_point_mass) else 0.0
 
             primitive[0] = sigma * j_current * cavity
-            primitive[1] = sqrt(vphi2) * phi_hat_x + vr * r_hat_x
-            primitive[2] = sqrt(vphi2) * phi_hat_y + vr * r_hat_y
+            primitive[1] = sqrt(vphi2) * phi_hat_x + (vrnu + vrpert) * r_hat_x
+            primitive[2] = sqrt(vphi2) * phi_hat_y + (vrnu + vrpert) * r_hat_y
             primitive[3] = pressure * cavity
             #
             # # See eq. (A2) from Goodman (2003)
@@ -522,9 +523,9 @@ class AdiabaticParamSweep(SetupBase):
                     central_mass_msun=self.binary_mass, 
                     length_scale_pc=self.binary_separation,
                     mach_number_a=self.mach_at_a,
-                    # mach_number_3a=self.mach_at_3a,
-                    alpha=self.alpha
-                    )
+                    alpha=self.alpha,
+                    gamma=self.gamma_law_index,
+                 )
             return dict(
                 eos_type=EquationOfState.GAMMA_LAW,
                 gamma_law_index=self.gamma_law_index,
