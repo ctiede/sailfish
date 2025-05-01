@@ -3,8 +3,8 @@ import pickle
 import sys
 import cmasher as cmr
 
-sys.path.insert(1, "/Users/ctiede/Research/sailfish")
-# sys.path.insert(1, "/groups/astro/ctiede/sailfish")
+# sys.path.insert(1, "/Users/ctiede/Research/sailfish")
+sys.path.insert(1, "/groups/astro/ctiede/sailfish")
 
 
 def load_checkpoint(filename, require_solver=None):
