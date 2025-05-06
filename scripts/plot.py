@@ -4,7 +4,7 @@ import sys
 import cmasher as cmr
 
 # sys.path.insert(1, "/Users/ctiede/Research/sailfish")
-sys.path.insert(1, "/groups/astro/ctiede/sailfish")
+sys.path.insert(1, "/groups/astro/ctiede/sailfish-sweep")
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -458,6 +458,11 @@ def main_cbdgam_2d():
         help="plot the domain out to this radius",
     )
     parser.add_argument(
+        "--orbital-elements",
+        '-oe',
+        action="store_true",
+    )
+    parser.add_argument(
         "--save",
         action="store_true",
         help="save PNG files instead of showing a window",
@@ -466,7 +471,7 @@ def main_cbdgam_2d():
     args = parser.parse_args()
 
     for filename in args.checkpoints:
-        fig, ax = plt.subplots(figsize=[10, 10])
+        fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename, require_solver="cbdgam_2d")
         mesh = chkpt["mesh"]
         prim = chkpt["solution"]
@@ -484,6 +489,18 @@ def main_cbdgam_2d():
             cmap="magma",
             extent=extent,
         )
+
+        if args.orbital_elements:
+            import sailfish.physics.kepler as kepler
+            m1 = chkpt['point_masses'][0]
+            m2 = chkpt['point_masses'][1]
+            m1 = kepler.PointMass(m1.mass, m1.position_x, m1.position_y, m1.velocity_x, m1.velocity_y)
+            m2 = kepler.PointMass(m2.mass, m2.position_x, m2.position_y, m2.velocity_x, m2.velocity_y) 
+            orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
+            fig.suptitle('t={:.2f} orbits  :   e={:.3f}   q={:.3f} '.format(chkpt['time'] / 2. / np.pi, orbital_state.eccentricity, orbital_state.mass_ratio))
+        else:
+            fig.suptitle(filename)
+
         ax.set_aspect("equal")
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
@@ -492,7 +509,7 @@ def main_cbdgam_2d():
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
-        fig.suptitle(filename)
+        #fig.suptitle(filename)
 
         if args.save:
             pngname = filename.replace(".pk", ".png")

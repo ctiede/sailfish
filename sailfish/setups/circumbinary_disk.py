@@ -389,6 +389,7 @@ class AdiabaticParamSweep(SetupBase):
     initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
     initial_pressure    = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
     cavity_radius       = param(2.5 , "radius of the cavity in initial profiles")
+    disk_kick           = param(0.0 , "kick velocity to seed eccentric cavity growth")
     # cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
     alpha               = param(0.1, "alpha-viscosity parameter (gamma-law)")
     nu                  = param(0.001, "kinematic viscosity parameter (isothermal)")
@@ -468,7 +469,7 @@ class AdiabaticParamSweep(SetupBase):
             dpdr = -3. / 2. * ss.surface_pressure_coefficient * r_softened**(-5. / 2.)
             qquad = 1. / 4. * q / (1. + q)**2 * (1. +  3. / 2. * self.eccentricity_init**2) * (not self.single_point_mass)
             vphi2 = GM / r_softened * (1. + 3. * qquad / r_softened**2) + r_softened / sigma * dpdr
-            vrpert = 1e-3 * y * exp(-((r / 3.5) ** 6)) if (not self.single_point_mass) else 0.0
+            vrpert = self.disk_kick * y * exp(-((r / 3.5) ** 6)) if (not self.single_point_mass) else 0.0
 
             primitive[0] = sigma * j_current * cavity
             primitive[1] = sqrt(vphi2) * phi_hat_x + (vrnu + vrpert) * r_hat_x
