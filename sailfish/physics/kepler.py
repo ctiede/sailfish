@@ -122,7 +122,7 @@ class OrbitalState(NamedTuple):
         a   = self.semimajor_axis
         L   = self.angular_momentum
         ecc = sqrt(1 - clamp_between_zero_and_one(L**2 / M / mu**2 / a))
-        print("[orbit] e={:.3f} q={:.3f}".format(ecc, self.mass_ratio))
+        print("[orbit] e={:.3f} q={:.2e}".format(ecc, self.mass_ratio))
         return ecc
     
     @property

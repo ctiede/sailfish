@@ -497,7 +497,7 @@ def main_cbdgam_2d():
             m1 = kepler.PointMass(m1.mass, m1.position_x, m1.position_y, m1.velocity_x, m1.velocity_y)
             m2 = kepler.PointMass(m2.mass, m2.position_x, m2.position_y, m2.velocity_x, m2.velocity_y) 
             orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
-            fig.suptitle('t={:.2f} orbits  :   e={:.3f}   q={:.3f} '.format(chkpt['time'] / 2. / np.pi, orbital_state.eccentricity, orbital_state.mass_ratio))
+            fig.suptitle('t={:.2f} orbits  :   e={:.3f}   q={:.2e} '.format(chkpt['time'] / 2. / np.pi, orbital_state.eccentricity, orbital_state.mass_ratio))
         else:
             fig.suptitle(filename)
 

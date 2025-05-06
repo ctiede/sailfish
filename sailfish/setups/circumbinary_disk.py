@@ -2,7 +2,7 @@
 2D disk setups for binary problems.
 """
 
-from math import sqrt, exp, pi
+from math import sqrt, exp, pi, log10
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import (
     EquationOfState,
@@ -407,6 +407,7 @@ class AdiabaticParamSweep(SetupBase):
     mach_number_final  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
     end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...", mutable=True) #dumb, just be smart
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
+    sweep_logspace     = param(False, "perform the sweep in logspace")
     which_diagnostics  = param("kitp", "output diagnostics option [kitp|forces|simple]")
     ell0               = param(0.0 , "initial guess for angular momentum current in the CBD; ell0!=0 will initialize with a cavity")
 
@@ -614,16 +615,32 @@ class AdiabaticParamSweep(SetupBase):
         return 2.0 * pi
 
     @property
+    def sweep_time(self):
+        return self.reference_time_scale * (self.end_time - self.start_sweep_time)
+
+    @property
     def sweep_rate_e(self):
-        return (self.eccentricity_final - self.eccentricity_init) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))
+        e0 = self.eccentricity_init  if (self.eccentricity_init  > 0.0) else 1e-10
+        e1 = self.eccentricity_final if (self.eccentricity_final > 0.0) else 1e-10
+        estart = e0 if (not self.sweep_logspace) else log10(e0)
+        efinal = e1 if (not self.sweep_logspace) else log10(e1)
+        return (efinal - estart) / self.sweep_time
 
     @property
     def sweep_rate_q(self):
-        return (self.mass_ratio_final - self.mass_ratio_init) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))      
+        q0 = self.mass_ratio_init
+        q1 = self.mass_ratio_final
+        qstart = q0 if (not self.sweep_logspace) else log10(q0)
+        qfinal = q1 if (not self.sweep_logspace) else log10(q1)
+        return (qfinal - qstart) / self.sweep_time
 
     @property
     def sweep_rate_mach(self):
-        return (self.mach_number_final - self.mach_number_init) / (self.reference_time_scale * (self.end_time - self.start_sweep_time))      
+        ma0 = self.mach_number_init
+        ma1 = self.mach_number_final
+        mastart = ma0 if (not self.sweep_logspace) else log10(ma0)
+        mafinal = ma1 if (not self.sweep_logspace) else log10(ma1)
+        return (mafinal - mastart) / self.sweep_time
 
     def mach_number(self, time):
         start = self.start_sweep_time * self.reference_time_scale
@@ -633,11 +650,22 @@ class AdiabaticParamSweep(SetupBase):
     def orbital_elements(self, time):
         start = self.start_sweep_time * self.reference_time_scale
         sflag = (time >= start)
+        delta = (time - start) * sflag
+        efix  = (self.eccentricity_final == self.eccentricity_init)
+        e0 = self.eccentricity_init if (self.eccentricity_init > 0.0) else 1e-10
+        q0 = self.mass_ratio_init
+        e = e0 + self.sweep_rate_e * delta
+        q = q0 + self.sweep_rate_q * delta
+        if self.sweep_logspace:
+            loge = log10(e0) + self.sweep_rate_e * delta
+            logq = log10(q0) + self.sweep_rate_q * delta
+            e = 10**loge
+            q = 10**logq
         return OrbitalElements(
             semimajor_axis=1.0,
             total_mass=1.0,
-            mass_ratio=self.mass_ratio_init + self.sweep_rate_q * (time - start) * sflag,
-            eccentricity=self.eccentricity_init + self.sweep_rate_e * (time - start) * sflag,
+            mass_ratio=q,
+            eccentricity=e if (not efix) else self.eccentricity_init,
         )
 
     def point_masses(self, time):
