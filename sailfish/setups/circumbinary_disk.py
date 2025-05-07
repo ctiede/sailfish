@@ -405,8 +405,8 @@ class AdiabaticParamSweep(SetupBase):
     mass_ratio_final   = param(1.0 , "component mass ratio at end of sweep")
     mach_number_init   = param(10.0, "orbital Mach number (isothermal) at start of sweep")
     mach_number_final  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
-    end_time           = param(1e4 , "this setup uses end_time as model param; don't use driver.end_time until fixed...", mutable=True) #dumb, just be smart
     start_sweep_time   = param(500., "orbit where parameter sweeping begins")
+    end_sweep_time     = param(1e4 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ")
     sweep_logspace     = param(False, "perform the sweep in logspace")
     which_diagnostics  = param("kitp", "output diagnostics option [kitp|forces|simple]")
     ell0               = param(0.0 , "initial guess for angular momentum current in the CBD; ell0!=0 will initialize with a cavity")
@@ -608,7 +608,7 @@ class AdiabaticParamSweep(SetupBase):
 
     @property
     def default_end_time(self):
-        return self.end_time
+        return self.end_sweep_time
 
     @property
     def reference_time_scale(self):
@@ -616,7 +616,7 @@ class AdiabaticParamSweep(SetupBase):
 
     @property
     def sweep_time(self):
-        return self.reference_time_scale * (self.end_time - self.start_sweep_time)
+        return self.reference_time_scale * (self.end_sweep_time - self.start_sweep_time)
 
     @property
     def sweep_rate_e(self):
@@ -661,6 +661,10 @@ class AdiabaticParamSweep(SetupBase):
             logq = log10(q0) + self.sweep_rate_q * delta
             e = 10**loge
             q = 10**logq
+        if q > self.mass_ratio_final:
+            q = self.mass_ratio_final
+        if e > self.eccentricity_final:
+            e = self.eccentricity_final
         return OrbitalElements(
             semimajor_axis=1.0,
             total_mass=1.0,
