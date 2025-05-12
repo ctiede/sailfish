@@ -420,6 +420,8 @@ def main_cbdgam_2d():
         "vx": lambda p: p[:, :, 1],
         "vy": lambda p: p[:, :, 2],
         "pre": lambda p: p[:, :, 3],
+        "eps": lambda p: p[:, :, 3] / p[:, :, 0] / (5./3. - 1.),
+        "scale-height": None,
     }
 
     parser = argparse.ArgumentParser()
@@ -452,6 +454,11 @@ def main_cbdgam_2d():
         help="maximum value for colormap",
     )
     parser.add_argument(
+        "--cmap",
+        default=cmr.sunburst,
+        help="colormap name",
+    )
+    parser.add_argument(
         "--radius",
         default=None,
         type=float,
@@ -463,18 +470,60 @@ def main_cbdgam_2d():
         action="store_true",
     )
     parser.add_argument(
+        "--draw-binary",
+        action="store_true",
+    )
+    parser.add_argument(
         "--save",
         action="store_true",
         help="save PNG files instead of showing a window",
     )
-
+    parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
+
+    class ScaleHeight:
+        def __init__(self, mesh, masses, logh, gamma=5./3.):
+            self.mesh = mesh
+            self.masses = masses
+            self.gamma = gamma
+            self.logh = logh
+
+        def __call__(self, primitive):
+            print('h0 / a: ', logh)
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            r = np.sqrt(x * x + y * y + 1e-12)
+            x1 = self.masses[0].position_x
+            y1 = self.masses[0].position_y
+            x2 = self.masses[1].position_x
+            y2 = self.masses[1].position_y
+            m1 = self.masses[0].mass
+            m2 = self.masses[1].mass
+            rs1 = self.masses[0].softening_length
+            rs2 = self.masses[1].softening_length
+            delx1 = x - x1
+            dely1 = y - y1
+            delx2 = x - x2
+            dely2 = y - y2
+            dr1 = np.sqrt(delx1**2 + dely1**2 + rs1**2)
+            dr2 = np.sqrt(delx2**2 + dely2**2 + rs2**2)
+            omegasq1 = m1 * dr1**(-3.)
+            omegasq2 = m2 * dr2**(-3.)
+            omegatilde = np.sqrt(omegasq1 + omegasq2)
+            sigma = primitive[:, :, 0]
+            pres = primitive[:, :, 3]
+            h = np.sqrt(self.gamma * pres / sigma) / omegatilde
+            return h / r
 
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename, require_solver="cbdgam_2d")
         mesh = chkpt["mesh"]
         prim = chkpt["solution"]
+        logh = np.log10(1. / chkpt['model_parameters']['mach_at_a'])
+        fields["scale-height"] = ScaleHeight(mesh, chkpt["point_masses"], logh)
         f = fields[args.field](prim).T
 
         if args.log:
@@ -486,9 +535,16 @@ def main_cbdgam_2d():
             origin="lower",
             vmin=args.vmin,
             vmax=args.vmax,
-            cmap="magma",
+            cmap=args.cmap,
             extent=extent,
         )
+
+        if args.draw_binary:
+            x1 = chkpt["point_masses"][0].position_x
+            y1 = chkpt["point_masses"][0].position_y
+            x2 = chkpt["point_masses"][1].position_x
+            y2 = chkpt["point_masses"][1].position_y
+            ax.scatter([x1, x2], [y1, y2], s=2, c='w')
 
         if args.orbital_elements:
             import sailfish.physics.kepler as kepler
