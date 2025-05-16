@@ -305,6 +305,7 @@ PRIVATE void shear_strain(
 // ============================================================================
 PRIVATE void cooling_term(
     double cooling_coefficient,
+    double opacity,
     double mach_ceiling,
     double dt,
     double *prim,
@@ -320,6 +321,9 @@ PRIVATE void cooling_term(
 
     double ek = 0.5 * (vx * vx + vy * vy);
     eps_cooled = max2(eps_cooled, 2.0 * ek / gamma / (gamma - 1.0) * pow(mach_ceiling, -2.0));
+
+    // Ignored for now
+    int tau_flag = (sigma * opacity >= 1) ? 1: 0;
 
     cons[3] += sigma * (eps_cooled - eps);
 }
@@ -495,6 +499,7 @@ PUBLIC void cbdgam_2d_advance_rk(
     double dt,
     double velocity_ceiling,
     double cooling_coefficient,
+    double opacity,
     double mach_ceiling,
     double density_floor,
     double pressure_floor,
@@ -687,7 +692,7 @@ PUBLIC void cbdgam_2d_advance_rk(
         primitive_to_conserved(pcc, ucc, gamma_law_index);
         buffer_source_term(&buffer, xc, yc, dt, ucc, gamma_law_index);
         point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc, constant_softening, gamma_law_index);
-        cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc, gamma_law_index);
+        cooling_term(cooling_coefficient, opacity, mach_ceiling, dt, pcc, ucc, gamma_law_index);
 
         for (int q = 0; q < NCONS; ++q)
         {

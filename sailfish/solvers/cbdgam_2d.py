@@ -205,6 +205,7 @@ class Patch:
                 dt,
                 self.options.velocity_ceiling,
                 self.physics.cooling_coefficient,
+                self.physics.opacity,
                 self.options.mach_ceiling,
                 self.options.density_floor,
                 self.options.pressure_floor,

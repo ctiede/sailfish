@@ -536,6 +536,7 @@ class AdiabaticParamSweep(SetupBase):
                 buffer_driving_rate=1000.0,  
                 buffer_onset_width=0.1,
                 cooling_coefficient=ss.cooling_coefficient(),
+                opacity=ss.opacity,
                 constant_softening=self.constant_softening,
                 viscosity_model=ViscosityModel.CONSTANT_ALPHA
                 if self.alpha > 0.0

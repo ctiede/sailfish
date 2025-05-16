@@ -146,6 +146,15 @@ class ShakuraSunyaevDisk(NamedTuple):
 		return 2. / 3 * mach**2 / self.alpha * r**(3./2.)
 
 	# -------------------------------------------------------------------------
+	@property
+	def opacity(self):
+		""" Give the gas opcaity in code units 
+
+		    - right now only for electron scattering
+		"""
+		return cgs['kappa'] / (self._length**2 / self._mass)
+	
+
 	def cooling_coefficient(self) -> float:
 		"""Assumes avg fluid particle mass is the proton mass
 	
@@ -159,9 +168,9 @@ class ShakuraSunyaevDisk(NamedTuple):
 		"""
 		mp_code = cgs['mp'] /  self._mass
 		kb_code = cgs['kb'] / (self._mass * self._length**2 / self._time**2)
-		kappa_code  = cgs['kappa'] / (self._length**2 / self._mass)
+		# kappa_code  = cgs['kappa'] / (self._length**2 / self._mass)
 		sigmab_code = cgs['sigmab'] / (self._mass / self._time**3)	
-		qdot_coeff = 8. / 3. * sigmab_code / kappa_code * (mp_code / kb_code)**4 * (self.gamma - 1.)**4
+		qdot_coeff = 8. / 3. * sigmab_code / self.opacity * (mp_code / kb_code)**4 * (self.gamma - 1.)**4
 		logger.info(f"density coefficient : {self.surface_density_coefficient:0.2e}")
 		logger.info(f"pressure coefficient : {self.surface_pressure_coefficient:0.2e}")
 		logger.info(f"implied eddington fraction : {self._eddington_fraction:0.2e}")

@@ -195,6 +195,9 @@ class Physics(NamedTuple):
     cooling_coefficient: float = 0.0
     """ Strength of the cooling term """
 
+    opacity: float = 1.0
+    """ Gas opacity for cooling source """
+
     constant_softening: bool = True
     """ If local disk height is ignored in gravitational softening """
 
