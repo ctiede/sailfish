@@ -40,6 +40,28 @@ PRIVATE void plm_gradient(double *yl, double *y0, double *yr, double *g)
     }
 }
 
+// Returns 1 if fallback occurred, 0 otherwise
+PRIVATE inline void fallback_if_dangerous(double *prim, const double *pcc, double dfloor, double pfloor, double vceil)
+{
+    int fallback = 0;
+    if (prim[0] < dfloor || !isfinite(prim[0]) || prim[3] < pfloor || !isfinite(prim[3])) 
+    {
+        fallback = 1;
+    }
+    if (fabs(prim[1]) > vceil || fabs(prim[2]) > vceil) 
+    {
+        fallback = 1;
+    }
+    if (fallback) 
+    {
+        printf("Fallback required in primitive reconstruction\n");
+        prim[0] = pcc[0];
+        prim[1] = pcc[1];
+        prim[2] = pcc[2];
+        prim[3] = pcc[3];
+    }
+}
+
 
 // ============================ INTERNAL STRUCTS ==============================
 // ============================================================================
@@ -323,7 +345,7 @@ PRIVATE void cooling_term(
     eps_cooled = max2(eps_cooled, 2.0 * ek / gamma / (gamma - 1.0) * pow(mach_ceiling, -2.0));
 
     // Ignored for now
-    int tau_flag = (sigma * opacity >= 1) ? 1: 0;
+    // int tau_flag = (sigma * opacity >= 1) ? 1: 0;
 
     cons[3] += sigma * (eps_cooled - eps);
 }
@@ -349,13 +371,13 @@ PRIVATE void conserved_to_primitive(
         // Induced some funny behavior in sinks....
         // but may still be important in cavity
         // TODO: test in binary setup
-        // vx = 0.0;
-        // vy = 0.0;
+        vx = 0.0;
+        vy = 0.0;
     }
 
     // TEMP: Check for precission loss in energy equation
     double epsilon = 2.2204460492503131e-16; // <float.h> -> DBL_EPSILON, double precession limit
-    double internal_energy = cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]);
+    double internal_energy = cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]) / cons[0];
     if (fabs(internal_energy) < epsilon * fabs(cons[3])) {
         printf("Pressure floor is adding heat, e = %e\n", internal_energy);
     }
@@ -626,6 +648,15 @@ PUBLIC void cbdgam_2d_advance_rk(
             prjm[q] = pcc[q] + 0.5 * gycc[q];
             prjp[q] = prj[q] - 0.5 * gyrj[q];
         }
+
+        fallback_if_dangerous(plim, pli, density_floor, pressure_floor, velocity_ceiling);
+        fallback_if_dangerous(plip, pcc, density_floor, pressure_floor, velocity_ceiling);
+        fallback_if_dangerous(prim, pcc, density_floor, pressure_floor, velocity_ceiling);
+        fallback_if_dangerous(prip, pri, density_floor, pressure_floor, velocity_ceiling);
+        fallback_if_dangerous(pljm, plj, density_floor, pressure_floor, velocity_ceiling);
+        fallback_if_dangerous(pljp, pcc, density_floor, pressure_floor, velocity_ceiling);
+        fallback_if_dangerous(prjm, pcc, density_floor, pressure_floor, velocity_ceiling);
+        fallback_if_dangerous(prjp, prj, density_floor, pressure_floor, velocity_ceiling);
 
         double fli[NCONS];
         double fri[NCONS];
