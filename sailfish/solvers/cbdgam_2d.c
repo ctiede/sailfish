@@ -13,6 +13,7 @@ TODO:
 // ============================================================================
 #define NCONS 4
 #define PLM_THETA 1.5
+#define GRAD_MAX 1e6
 
 
 // ============================ MATH ==========================================
@@ -26,9 +27,16 @@ TODO:
 
 PRIVATE double plm_gradient_scalar(double yl, double y0, double yr)
 {
-    double a = (y0 - yl) * PLM_THETA;
-    double b = (yr - yl) * 0.5;
-    double c = (yr - y0) * PLM_THETA;
+    double gl = (y0 - yl);
+    double gr = (yr - y0);
+    double g0 = (yr - yl);
+    double gmax = max3(fabs(gl), fabs(gr), fabs(g0));
+    double ymin = min3(fabs(yl), fabs(yr), fabs(y0));
+    double grel = gmax / max2(ymin, 1e-12);
+    double theta = (grel > GRAD_MAX) ? 1.0 : PLM_THETA;
+    double a = gl * theta;
+    double b = g0 * 0.5;
+    double c = gr * theta;
     return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
 }
 
@@ -40,8 +48,7 @@ PRIVATE void plm_gradient(double *yl, double *y0, double *yr, double *g)
     }
 }
 
-// Returns 1 if fallback occurred, 0 otherwise
-PRIVATE inline void fallback_if_dangerous(double *prim, const double *pcc, double dfloor, double pfloor, double vceil)
+PRIVATE void fallback_if_dangerous(double *prim, const double *pcc, double dfloor, double pfloor, double vceil)
 {
     int fallback = 0;
     if (prim[0] < dfloor || !isfinite(prim[0]) || prim[3] < pfloor || !isfinite(prim[3])) 
@@ -59,6 +66,33 @@ PRIVATE inline void fallback_if_dangerous(double *prim, const double *pcc, doubl
         prim[1] = pcc[1];
         prim[2] = pcc[2];
         prim[3] = pcc[3];
+    }
+}
+
+PRIVATE void check_conserved(const double *cons, int i, int j, const char *label) {
+    double rho = cons[0];
+    double px  = cons[1];
+    double py  = cons[2];
+    double en  = cons[3];
+
+    int bad = 0;
+
+    if (!isfinite(rho) || rho <= 0.0) {
+        printf("[BAD CONSERVED] %s at (%d, %d): rho = %.4e\n", label, i, j, rho);
+        bad = 1;
+    }
+    if (!isfinite(en) || en <= 0.0) {
+        printf("[BAD CONSERVED] %s at (%d, %d): energy = %.4e\n", label, i, j, en);
+        bad = 1;
+    }
+    if (!isfinite(px) || !isfinite(py)) {
+        printf("[BAD CONSERVED] %s at (%d, %d): momentum = (%.4e, %.4e)\n", label, i, j, px, py);
+        bad = 1;
+    }
+
+    if (bad) {
+        double ke = 0.5 * (px * px + py * py) / rho;
+        printf("    total energy = %.4e, kinetic = %.4e, internal = %.4e\n", en, ke, en - ke);
     }
 }
 
@@ -649,14 +683,15 @@ PUBLIC void cbdgam_2d_advance_rk(
             prjp[q] = prj[q] - 0.5 * gyrj[q];
         }
 
-        fallback_if_dangerous(plim, pli, density_floor, pressure_floor, velocity_ceiling);
-        fallback_if_dangerous(plip, pcc, density_floor, pressure_floor, velocity_ceiling);
-        fallback_if_dangerous(prim, pcc, density_floor, pressure_floor, velocity_ceiling);
-        fallback_if_dangerous(prip, pri, density_floor, pressure_floor, velocity_ceiling);
-        fallback_if_dangerous(pljm, plj, density_floor, pressure_floor, velocity_ceiling);
-        fallback_if_dangerous(pljp, pcc, density_floor, pressure_floor, velocity_ceiling);
-        fallback_if_dangerous(prjm, pcc, density_floor, pressure_floor, velocity_ceiling);
-        fallback_if_dangerous(prjp, prj, density_floor, pressure_floor, velocity_ceiling);
+        // TODO: Add a flag to toggle this
+        // fallback_if_dangerous(plim, pli, density_floor, pressure_floor, velocity_ceiling);
+        // fallback_if_dangerous(plip, pcc, density_floor, pressure_floor, velocity_ceiling);
+        // fallback_if_dangerous(prim, pcc, density_floor, pressure_floor, velocity_ceiling);
+        // fallback_if_dangerous(prip, pri, density_floor, pressure_floor, velocity_ceiling);
+        // fallback_if_dangerous(pljm, plj, density_floor, pressure_floor, velocity_ceiling);
+        // fallback_if_dangerous(pljp, pcc, density_floor, pressure_floor, velocity_ceiling);
+        // fallback_if_dangerous(prjm, pcc, density_floor, pressure_floor, velocity_ceiling);
+        // fallback_if_dangerous(prjp, prj, density_floor, pressure_floor, velocity_ceiling);
 
         double fli[NCONS];
         double fri[NCONS];
