@@ -14,6 +14,7 @@ TODO:
 #define NCONS 4
 #define PLM_THETA 1.5
 #define GRAD_MAX 1e6
+#define HRMAX 0.8
 
 
 // ============================ MATH ==========================================
@@ -387,6 +388,9 @@ PRIVATE void cooling_term(
 PRIVATE void conserved_to_primitive(
     const double *cons,
     double *prim,
+    struct PointMassList *mass_list,
+    double xc,
+    double yc, 
     double velocity_ceiling,
     double density_floor,
     double pressure_floor,
@@ -408,7 +412,7 @@ PRIVATE void conserved_to_primitive(
         vx = 0.0;
         vy = 0.0;
     }
-
+ 
     // TEMP: Check for precission loss in energy equation
     double epsilon = 2.2204460492503131e-16; // <float.h> -> DBL_EPSILON, double precession limit
     double internal_energy = cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]) / cons[0];
@@ -420,6 +424,14 @@ PRIVATE void conserved_to_primitive(
     prim[1] = vx;
     prim[2] = vy;
     prim[3] = pres;
+
+    double r = sqrt(xc * xc + yc * yc + 1e-12);
+    double h = disk_height(mass_list, xc, yc, prim, gamma_law_index);
+
+    if (h / r > HMAX) {
+	double omega_tilde = sqrt(gamma_law_index * pres / rho) / h;
+	prim[3] = rho / gamma_law_index * pow(r * omega_tilde * HRMAX, 2);
+    }
 }
 
 PRIVATE void primitive_to_conserved(const double *prim, double *cons, double gamma_law_index)
@@ -767,7 +779,7 @@ PUBLIC void cbdgam_2d_advance_rk(
         }
 
         double *pout = &primitive_wr[ncc];
-        conserved_to_primitive(ucc, pout, velocity_ceiling, density_floor, pressure_floor, gamma_law_index);
+        conserved_to_primitive(ucc, pout, &mass_list, xc, yc, velocity_ceiling, density_floor, pressure_floor, gamma_law_index);
     }
 }
 
