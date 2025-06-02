@@ -5,6 +5,7 @@ import cmasher as cmr
 
 # sys.path.insert(1, "/Users/ctiede/Research/sailfish")
 sys.path.insert(1, "/groups/astro/ctiede/sailfish-sweep")
+import load_sfdata_cbdgam2d as cbdgam
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -421,7 +422,12 @@ def main_cbdgam_2d():
         "vy": lambda p: p[:, :, 2],
         "pre": lambda p: p[:, :, 3],
         "eps": lambda p: p[:, :, 3] / p[:, :, 0] / (5./3. - 1.),
+        "temperature": None,
+        "optical-depth": None,
         "scale-height": None,
+        "cooling-rate": None,
+        "heating-rate": None,
+        "compressional-heating": None,
     }
 
     parser = argparse.ArgumentParser()
@@ -474,12 +480,38 @@ def main_cbdgam_2d():
         action="store_true",
     )
     parser.add_argument(
+        "--no-frame",
+        action="store_true",
+    )
+    parser.add_argument(
         "--save",
         action="store_true",
         help="save PNG files instead of showing a window",
     )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
+
+    class Temperature:
+        def __init__(self, disk):
+            self.disk = disk
+
+        def __call__(self, primitive):
+            from sailfish.physics.cooling import cgs
+            disk = self.disk
+            sigma = primitive[:, :, 0]
+            press = primitive[:, :, 3]
+            mp_code = cgs['mp'] /  disk._mass
+            kb_code = cgs['kb'] / (disk._mass * disk._length**2 / disk._time**2)
+            return (mp_code / kb_code) * press / sigma
+
+    class OpticalDepth:
+        def __init__(self, disk):
+            self.disk = disk
+
+        def __call__(self, primitive):
+            kappa = self.disk.opacity
+            sigma = primitive[:, :, 0]
+            return kappa * sigma
 
     class ScaleHeight:
         def __init__(self, mesh, masses, logh, gamma=5./3.):
@@ -517,15 +549,114 @@ def main_cbdgam_2d():
             h = np.sqrt(self.gamma * pres / sigma) / omegatilde
             return h / r
 
+    class CoolingRate:
+        def __init__(self, disk, dx, gamma=5./3.):
+            self.dx = dx
+            self.disk = disk
+            self.gamma = gamma
+
+        def __call__(self, primitive):
+            """ Qdot = Sigma * depsilon / dt  [ergs / s]
+
+                depsilon / dt = - 8 / 3 sigma T^4 / (tau Sigma)
+                              = - 8 / 3 (sigma / kappa) (mp / kb)^4 P^4 / Sigma^6
+                              = - beta / (gamma - 1)^4 P^4 / Sigma^6
+            """
+            disk = self.disk
+            sigma = primitive[:, :, 0]
+            press = primitive[:, :, 3]
+            beta = disk.cooling_coefficient()
+            qdot = beta / (self.gamma - 1.)**4 * press**4 / sigma**5
+            units = disk._mass / disk._time**3
+            # units = disk._mass * disk._length**2 / disk._time**3
+            return qdot * units # * self.dx**2
+
+    class HeatingRate:
+        def __init__(self, mesh, masses, disk, gamma=5./3.):
+            self.mesh = mesh
+            self.masses = masses
+            self.disk = disk
+            self.gamma = gamma
+
+        def __call__(self, primitive):
+            disk = self.disk
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            r = np.sqrt(x * x + y * y + 1e-12)
+            dx = mesh.dx
+            dy = mesh.dx # uniform grid
+            sig = primitive[:, :, 0]
+            vx  = primitive[:, :, 1]
+            vy  = primitive[:, :, 2]
+            pre = primitive[:, :, 3]
+            x1 = self.masses[0].position_x
+            y1 = self.masses[0].position_y
+            x2 = self.masses[1].position_x
+            y2 = self.masses[1].position_y
+            m1 = self.masses[0].mass
+            m2 = self.masses[1].mass
+            rs1 = self.masses[0].softening_length
+            rs2 = self.masses[1].softening_length
+            delx1 = x - x1
+            dely1 = y - y1
+            delx2 = x - x2
+            dely2 = y - y2
+            dr1 = np.sqrt(delx1**2 + dely1**2 + rs1**2)
+            dr2 = np.sqrt(delx2**2 + dely2**2 + rs2**2)
+            omegasq1 = m1 * dr1**(-3.)
+            omegasq2 = m2 * dr2**(-3.)
+            omegatilde = np.sqrt(omegasq1 + omegasq2)
+            h = np.sqrt(self.gamma * pre / sig) / omegatilde
+            cs2 = pre / sig * self.gamma
+            nu = disk.alpha * np.sqrt(cs2) * h
+            dvxdx, dvxdy = np.gradient(vx, dx, dy)
+            dvydx, dvydy = np.gradient(vy, dx, dy)
+            sxx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy;
+            syy =-2.0 / 3.0 * dvxdx + 4.0 / 3.0 * dvydy;
+            sxy = 1.0 / 1.0 * dvydx + 1.0 / 1.0 * dvxdy;
+            heat = nu * sig * (sxx * dvxdx + syy * dvydy + sxy * (dvxdy + dvydx))
+            heat[heat == 0.0] += 1e-12
+            units = disk._mass / disk._time**3
+            # units = disk._mass * disk._length**2 / disk._time**3
+            return heat * units # * dx * dy 
+
+    class CompressionHeating:
+        def __init__(self, mesh, disk):
+            self.mesh = mesh
+            self.disk = disk
+
+        def __call__(self, primitive):
+            mesh = self.mesh
+            disk = self.disk
+            vx  = primitive[:, :, 1]
+            vy  = primitive[:, :, 2]
+            pre = primitive[:, :, 3]
+            dvxdx, _ = np.gradient(vx, mesh.dx, mesh.dy)
+            _, dvydy = np.gradient(vy, mesh.dx, mesh.dy)
+            units = disk._mass / disk._time**3
+            heat = -pre * (dvxdx + dvydy) * units
+            heat[heat <= 0.0] = 1e-10 # Only keep the heating (no cooling)
+            return heat
+
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename, require_solver="cbdgam_2d")
         mesh = chkpt["mesh"]
         prim = chkpt["solution"]
         logh = np.log10(1. / chkpt['model_parameters']['mach_at_a'])
+        fields["temperature"] = Temperature(cbdgam.get_ss_disk_model(filename))
         fields["scale-height"] = ScaleHeight(mesh, chkpt["point_masses"], logh)
+        fields["cooling-rate"] = CoolingRate(cbdgam.get_ss_disk_model(filename), mesh.dx)
+        fields["heating-rate"] = HeatingRate(mesh, chkpt['point_masses'], cbdgam.get_ss_disk_model(filename))
+        fields["optical-depth"] = OpticalDepth(cbdgam.get_ss_disk_model(filename))
+        fields["compressional-heating"] = CompressionHeating(mesh, cbdgam.get_ss_disk_model(filename))
         f = fields[args.field](prim).T
 
+        if args.field == 'sigma':
+            s0 = cbdgam.get_ss_disk_model(filename).surface_density_coefficient
+            f = f / s0
         if args.log:
             f = np.log10(f)
 
@@ -555,13 +686,24 @@ def main_cbdgam_2d():
             orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
             fig.suptitle('t={:.2f} orbits  :   e={:.3f}   q={:.2e} '.format(chkpt['time'] / 2. / np.pi, orbital_state.eccentricity, orbital_state.mass_ratio))
         else:
-            fig.suptitle(filename)
+            if args.no_frame == False:
+                fig.suptitle(filename)
 
         ax.set_aspect("equal")
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
-        fig.colorbar(cm)
+        if args.no_frame:
+            ax.axis('off')
+        else:
+            cbar = fig.colorbar(cm)
+            cblabel = {'sigma'        : r'$\log_{10}(\Sigma / \Sigma_0)$',
+                       'temperature'  : r'$\log_{10}(T)$ [K]',
+                       'cooling-rate' : r'$\log_{10}(\dot Q)$ [ergs / s / cm$^2$]',
+                       'heating-rate' : r'$\log_{10}(\tau\, \nabla v)$ [ergs / s / cm$^2$]'}
+            if args.field in cblabel:
+                cbar.set_label(cblabel[args.field])
+
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
@@ -570,7 +712,7 @@ def main_cbdgam_2d():
         if args.save:
             pngname = filename.replace(".pk", ".png")
             print(pngname)
-            fig.savefig(pngname, dpi=400)
+            fig.savefig(pngname, dpi=400, bbox_inches='tight', pad_inches=0.0 if args.no_frame else 0.05, transparent=args.no_frame)
             plt.close()
 
     if not args.save:
