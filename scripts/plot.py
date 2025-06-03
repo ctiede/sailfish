@@ -2,12 +2,38 @@ import argparse
 import pickle
 import sys
 import cmasher as cmr
+import matplotlib.pyplot as plt
 
 # sys.path.insert(1, "/Users/ctiede/Research/sailfish")
 sys.path.insert(1, "/groups/astro/ctiede/sailfish-sweep")
 import load_sfdata_cbdgam2d as cbdgam
 
+# -----------------------------------------------------------------------------
+text_width   = 7.1
+column_width = 3.35225
+def configure_matplotlib():
+    plt.rc('xtick' , labelsize=8)
+    plt.rc('ytick' , labelsize=8)
+    plt.rc('axes'  , labelsize=8)
+    plt.rc('legend', fontsize=8)
+    plt.rc('font', family='DejaVu Sans', size=8)
+    plt.rc('text', usetex=True)
 
+def config_axes_negative(ax, leg=None, cbar=None):
+    ax.spines['bottom'].set_color('white')
+    ax.spines['top'   ].set_color('white' )
+    ax.spines['right' ].set_color('white')
+    ax.spines['left'  ].set_color('white')
+    ax.tick_params(which='both', colors='white')
+    # ax.tick_params(direction='in', which='both', colors='white')
+    ax.yaxis.label.set_color('white')
+    ax.xaxis.label.set_color('white')
+    if leg is not None:
+        [txt.set_color("white") for txt in leg.get_texts()]
+    if cbar is not None:
+        plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
+
+# -----------------------------------------------------------------------------
 def load_checkpoint(filename, require_solver=None):
     with open(filename, "rb") as file:
         chkpt = pickle.load(file)
@@ -19,9 +45,8 @@ def load_checkpoint(filename, require_solver=None):
             )
         return chkpt
 
-
+# -----------------------------------------------------------------------------
 def main_srhd_1d():
-    import matplotlib.pyplot as plt
     from sailfish.mesh import LogSphericalMesh
 
     parser = argparse.ArgumentParser()
@@ -49,9 +74,8 @@ def main_srhd_1d():
     ax.legend()
     plt.show()
 
-
+# -----------------------------------------------------------------------------
 def main_srhd_2d():
-    import matplotlib.pyplot as plt
     import numpy as np
     import sailfish
 
@@ -141,9 +165,8 @@ def main_srhd_2d():
 
     plt.show()
 
-
+# -----------------------------------------------------------------------------
 def main_cbdiso_2d():
-    import matplotlib.pyplot as plt
     import numpy as np
 
     fields = {
@@ -407,13 +430,12 @@ def main_cbdiso_2d():
     if not args.save:
         plt.show()
 
-
+# -----------------------------------------------------------------------------
 def main_cbdisodg_2d():
     main_cbdiso_2d()
 
-
+# -----------------------------------------------------------------------------
 def main_cbdgam_2d():
-    import matplotlib.pyplot as plt
     import numpy as np
 
     fields = {
@@ -425,6 +447,7 @@ def main_cbdgam_2d():
         "temperature": None,
         "optical-depth": None,
         "scale-height": None,
+        "mach-number": None,
         "cooling-rate": None,
         "heating-rate": None,
         "compressional-heating": None,
@@ -484,12 +507,22 @@ def main_cbdgam_2d():
         action="store_true",
     )
     parser.add_argument(
+        "--fancy",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--negative",
+        action="store_true",
+    )
+    parser.add_argument(
         "--save",
         action="store_true",
         help="save PNG files instead of showing a window",
     )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
+    if args.fancy:
+            configure_matplotlib()
 
     class Temperature:
         def __init__(self, disk):
@@ -641,13 +674,17 @@ def main_cbdgam_2d():
             return heat
 
     for filename in args.checkpoints:
-        fig, ax = plt.subplots(figsize=[12, 9])
+        if args.fancy:
+            fig, ax = plt.subplots(figsize=[1.2 * column_width, column_width])
+        else:
+            fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename, require_solver="cbdgam_2d")
         mesh = chkpt["mesh"]
         prim = chkpt["solution"]
         logh = np.log10(1. / chkpt['model_parameters']['mach_at_a'])
         fields["temperature"] = Temperature(cbdgam.get_ss_disk_model(filename))
         fields["scale-height"] = ScaleHeight(mesh, chkpt["point_masses"], logh)
+        fields["mach-number"] =  ScaleHeight(mesh, chkpt["point_masses"], logh)
         fields["cooling-rate"] = CoolingRate(cbdgam.get_ss_disk_model(filename), mesh.dx)
         fields["heating-rate"] = HeatingRate(mesh, chkpt['point_masses'], cbdgam.get_ss_disk_model(filename))
         fields["optical-depth"] = OpticalDepth(cbdgam.get_ss_disk_model(filename))
@@ -657,6 +694,8 @@ def main_cbdgam_2d():
         if args.field == 'sigma':
             s0 = cbdgam.get_ss_disk_model(filename).surface_density_coefficient
             f = f / s0
+        if args.field == 'mach-number':
+            f = 1. / f
         if args.log:
             f = np.log10(f)
 
@@ -669,6 +708,7 @@ def main_cbdgam_2d():
             cmap=args.cmap,
             extent=extent,
         )
+        ax.set_aspect("equal")
 
         if args.draw_binary:
             x1 = chkpt["point_masses"][0].position_x
@@ -686,33 +726,45 @@ def main_cbdgam_2d():
             orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
             fig.suptitle('t={:.2f} orbits  :   e={:.3f}   q={:.2e} '.format(chkpt['time'] / 2. / np.pi, orbital_state.eccentricity, orbital_state.mass_ratio))
         else:
-            if args.no_frame == False:
+            if not args.no_frame and not args.fancy:
                 fig.suptitle(filename)
 
-        ax.set_aspect("equal")
+        cblabel = {'sigma'        : r'$\log_{10}(\Sigma / \Sigma_0)$',
+                   'temperature'  : r'$\log_{10}(T)$ [K]',
+                   'cooling-rate' : r'$\log_{10}(\dot Q)$ [ergs / s / cm$^2$]',
+                   'heating-rate' : r'$\log_{10}(\tau\, \nabla v)$ [ergs / s / cm$^2$]',
+                   'scale-height' : r'$\log_{10}(h/r)$',
+                   'mach-number'  : r'$\log_{10}(\mathcal{M})$'}
+        basecol = 'w' if args.negative else 'k'
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
         if args.no_frame:
             ax.axis('off')
         else:
-            cbar = fig.colorbar(cm)
-            cblabel = {'sigma'        : r'$\log_{10}(\Sigma / \Sigma_0)$',
-                       'temperature'  : r'$\log_{10}(T)$ [K]',
-                       'cooling-rate' : r'$\log_{10}(\dot Q)$ [ergs / s / cm$^2$]',
-                       'heating-rate' : r'$\log_{10}(\tau\, \nabla v)$ [ergs / s / cm$^2$]'}
+            cbar = fig.colorbar(cm, pad=0.01)
+            cbar.ax.tick_params(size=0)
             if args.field in cblabel:
-                cbar.set_label(cblabel[args.field])
+                cbar.set_label(cblabel[args.field], color=basecol)
+            if args.field == 'mach-number':
+                cbar.ax.axhline(np.log10(1. / 10**logh), color='w', lw=1.2, alpha=0.7)
+            ax.set_xlabel(r'$x / a$')
+            ax.set_ylabel(r'$y / a$')
+        
 
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         #fig.suptitle(filename)
 
+        if args.negative:
+            config_axes_negative(ax, cbar=cbar)
+
         if args.save:
+            trans = (args.no_frame) or (args.negative)
             pngname = filename.replace(".pk", ".png")
             print(pngname)
-            fig.savefig(pngname, dpi=400, bbox_inches='tight', pad_inches=0.0 if args.no_frame else 0.05, transparent=args.no_frame)
+            fig.savefig(pngname, dpi=400, bbox_inches='tight', pad_inches=0.0 if args.no_frame else 0.05, transparent=trans)
             plt.close()
 
     if not args.save:

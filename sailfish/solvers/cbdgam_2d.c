@@ -428,7 +428,7 @@ PRIVATE void conserved_to_primitive(
     double r = sqrt(xc * xc + yc * yc + 1e-12);
     double h = disk_height(mass_list, xc, yc, prim, gamma_law_index);
 
-    if (h / r > HMAX) {
+    if (h / r > HRMAX) {
 	double omega_tilde = sqrt(gamma_law_index * pres / rho) / h;
 	prim[3] = rho / gamma_law_index * pow(r * omega_tilde * HRMAX, 2);
     }
