@@ -12,11 +12,13 @@ cgs = dict(
 		G = 6.6725985e-8,
 		c = 2.99792458e10,
 		kb = 1.38065812e-16,
+		h = 6.62607015e-27, # erg s
 		sigmab = 5.6705119e-5,
 		mp = 1.6726e-24,
 		kappa = 0.4,            # electron scattering
 		pc = 3.085678e18,
 		msun = 1.989e33,
+		yr = 3.254e7,
 	)
 
 logger = getLogger(__name__)

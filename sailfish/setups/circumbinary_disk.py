@@ -554,8 +554,10 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="time"),
                 dict(quantity="mdot", which_mass=1, accretion=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
-                # dict(quantity="angular_momentum"),
-                # dict(quantity="buffer_angular_momentum", buffer=True),
+                dict(quantity="torque", which_mass="both", gravity=True),
+                dict(quantity="torque", which_mass="both", accretion=True),
+                dict(quantity="angular_momentum"),
+                dict(quantity="buffer_angular_momentum", buffer=True),
             ]
         elif self.which_diagnostics == "forces":
             return [

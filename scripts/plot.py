@@ -451,6 +451,7 @@ def main_cbdgam_2d():
         "cooling-rate": None,
         "heating-rate": None,
         "compressional-heating": None,
+        "vorticity": None,
     }
 
     parser = argparse.ArgumentParser()
@@ -523,6 +524,18 @@ def main_cbdgam_2d():
     args = parser.parse_args()
     if args.fancy:
             configure_matplotlib()
+
+    class Vorticity:
+        def __init__(self, mesh):
+            self.mesh = mesh
+
+        def __call__(self, primitive):
+            sig = primitive[:, :, 0]
+            vx  = primitive[:, :, 1]
+            vy  = primitive[:, :, 2]
+            _, dvxdy = np.gradient(vx, mesh.dx, mesh.dy)
+            dvydx, _ = np.gradient(vy, mesh.dx, mesh.dy)
+            return np.abs(dvydx - dvxdy)
 
     class Temperature:
         def __init__(self, disk):
@@ -682,6 +695,7 @@ def main_cbdgam_2d():
         mesh = chkpt["mesh"]
         prim = chkpt["solution"]
         logh = np.log10(1. / chkpt['model_parameters']['mach_at_a'])
+        fields["vorticity"] = Vorticity(mesh)
         fields["temperature"] = Temperature(cbdgam.get_ss_disk_model(filename))
         fields["scale-height"] = ScaleHeight(mesh, chkpt["point_masses"], logh)
         fields["mach-number"] =  ScaleHeight(mesh, chkpt["point_masses"], logh)
