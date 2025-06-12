@@ -360,6 +360,30 @@ PRIVATE void shear_strain(
 
 // ============================ HYDRO =========================================
 // ============================================================================
+PRIVATE void beta_cooling_source_term(
+    double beta,
+    struct PointMassList *mass_list,
+    double temp0,
+    double xc,
+    double yc, 
+    double dt,
+    double *prim,
+    double *cons,
+    double gamma_law_index)
+{
+    // RIGHT NOW IS NOT HANDLED ELEGANTLY 
+    // TODO : CLEAN WAY TO PICK BETWEEN RADIATIVE AND BETA COOLING
+    double r = sqrt(xc * xc + yc * yc + 1e-12);
+    double h = disk_height(mass_list, xc, yc, prim, gamma_law_index);
+    double cs2 = sound_speed_squared(gamma_law_index, prim);
+    double tcool = beta * h / sqrt(cs2); // (beta / omega_eff)
+    double temp = prim[3] / prim[0]; // I think these should both be in code units 
+    double temp_ref = temp0 * pow(r, -9. / 10.); // TODO : Generalize this to problem generator
+    double qdot = (tcool > 0.0) ? prim[0] * (temp - temp_ref) / (gamma_law_index - 1.) / tcool : 0.0;
+    cons[3] -= dt * qdot;
+}
+
+
 PRIVATE void cooling_term(
     double cooling_coefficient,
     double opacity,
@@ -429,8 +453,8 @@ PRIVATE void conserved_to_primitive(
     double h = disk_height(mass_list, xc, yc, prim, gamma_law_index);
 
     if (h / r > HRMAX) {
-	double omega_tilde = sqrt(gamma_law_index * pres / rho) / h;
-	prim[3] = rho / gamma_law_index * pow(r * omega_tilde * HRMAX, 2);
+    	double omega_tilde = sqrt(gamma_law_index * pres / rho) / h;
+    	prim[3] = rho / gamma_law_index * pow(r * omega_tilde * HRMAX, 2);
     }
 }
 
@@ -563,6 +587,8 @@ PUBLIC void cbdgam_2d_advance_rk(
     double sink_radius2,
     int sink_model2,
     double alpha, // other
+    double beta,
+    double temp0,
     double a,
     double dt,
     double velocity_ceiling,
@@ -771,6 +797,7 @@ PUBLIC void cbdgam_2d_advance_rk(
         buffer_source_term(&buffer, xc, yc, dt, ucc, gamma_law_index);
         point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc, constant_softening, gamma_law_index);
         cooling_term(cooling_coefficient, opacity, mach_ceiling, dt, pcc, ucc, gamma_law_index);
+        beta_cooling_source_term(beta, &mass_list, temp0, xc, yc,  dt, pcc, ucc, gamma_law_index);
 
         for (int q = 0; q < NCONS; ++q)
         {

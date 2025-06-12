@@ -416,6 +416,7 @@ class AdiabaticParamSweep(SetupBase):
     binary_separation = param(1e-3, "inital binary separation in parsec")
     mach_at_a         = param(10.,  "Mach number at r=a")
     # mach_at_3a        = param(10.,  "Mach number at r=3a")
+    beta              = param(0.0, "beta cooling timescale (radiative cooling if 0.0)")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -535,7 +536,9 @@ class AdiabaticParamSweep(SetupBase):
                 buffer_is_enabled=self.buffer_is_enabled,
                 buffer_driving_rate=1000.0,  
                 buffer_onset_width=0.1,
-                cooling_coefficient=ss.cooling_coefficient(),
+                # cooling_coefficient=ss.cooling_coefficient(),
+                cooling_coefficient=ss.cooling_coefficient() if self.beta == 0.0 else 0.0,
+                beta = self.beta,
                 opacity=ss.opacity,
                 constant_softening=self.constant_softening,
                 viscosity_model=ViscosityModel.CONSTANT_ALPHA
@@ -545,6 +548,7 @@ class AdiabaticParamSweep(SetupBase):
                 alpha=self.alpha,
                 diagnostics=self.diagnostics,
                 retrograde=self.retrograde,
+                reference_temperature=ss.surface_pressure_coefficient / ss.surface_density_coefficient,
             )
 
     @property
@@ -556,8 +560,8 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="mdot", which_mass=2, accretion=True),
                 dict(quantity="torque", which_mass="both", gravity=True),
                 dict(quantity="torque", which_mass="both", accretion=True),
-                dict(quantity="angular_momentum"),
-                dict(quantity="buffer_angular_momentum", buffer=True),
+                # dict(quantity="angular_momentum"),
+                # dict(quantity="buffer_angular_momentum", buffer=True),
             ]
         elif self.which_diagnostics == "forces":
             return [

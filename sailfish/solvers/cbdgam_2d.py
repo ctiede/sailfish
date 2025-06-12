@@ -201,6 +201,8 @@ class Patch:
                 m2.sink_radius,
                 m2.sink_model.value,
                 self.physics.alpha,
+                self.physics.beta,
+                self.physics.reference_temperature,
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,

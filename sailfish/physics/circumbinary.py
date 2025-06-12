@@ -189,11 +189,17 @@ class Physics(NamedTuple):
     point_mass_function: Callable[[float], List[PointMass]] = None
     """ Callback function to supply point masses as a function of time """
 
+    reference_temperature: float = 0.0
+    """ Disk temperature (for beta cooling) """
+
     mach_number_function: Callable[[float], List[float]] = None
     """ Callback function to mach numbert as a function of time """    
 
     cooling_coefficient: float = 0.0
     """ Strength of the cooling term """
+
+    beta: float = 0.0
+    """ Strength of beta cooling """
 
     opacity: float = 1.0
     """ Gas opacity for cooling source """
