@@ -445,6 +445,7 @@ def main_cbdgam_2d():
         "pre": lambda p: p[:, :, 3],
         "eps": lambda p: p[:, :, 3] / p[:, :, 0] / (5./3. - 1.),
         "temperature": None,
+        "peak-frequency": None,
         "optical-depth": None,
         "scale-height": None,
         "mach-number": None,
@@ -549,6 +550,21 @@ def main_cbdgam_2d():
             mp_code = cgs['mp'] /  disk._mass
             kb_code = cgs['kb'] / (disk._mass * disk._length**2 / disk._time**2)
             return (mp_code / kb_code) * press / sigma
+
+    class PeakFrequency:
+        def __init__(self, disk):
+            self.disk = disk
+
+        def __call__(self, primitive):
+            from sailfish.physics.cooling import cgs
+            disk = self.disk
+            sigma = primitive[:, :, 0]
+            press = primitive[:, :, 3]
+            mp_code = cgs['mp'] /  disk._mass
+            kb_code = cgs['kb'] / (disk._mass * disk._length**2 / disk._time**2)
+            tempk = (mp_code / kb_code) * press / sigma
+            teff = tempk * (disk._eddington_fraction)**(-1./4.)
+            return 5.879e10 * teff # Hz
 
     class OpticalDepth:
         def __init__(self, disk):
@@ -703,6 +719,7 @@ def main_cbdgam_2d():
         fields["heating-rate"] = HeatingRate(mesh, chkpt['point_masses'], cbdgam.get_ss_disk_model(filename))
         fields["optical-depth"] = OpticalDepth(cbdgam.get_ss_disk_model(filename))
         fields["compressional-heating"] = CompressionHeating(mesh, cbdgam.get_ss_disk_model(filename))
+        fields["peak-frequency"] = PeakFrequency(cbdgam.get_ss_disk_model(filename))
         f = fields[args.field](prim).T
 
         if args.field == 'sigma':
@@ -748,7 +765,9 @@ def main_cbdgam_2d():
                    'cooling-rate' : r'$\log_{10}(\dot Q)$ [ergs / s / cm$^2$]',
                    'heating-rate' : r'$\log_{10}(\tau\, \nabla v)$ [ergs / s / cm$^2$]',
                    'scale-height' : r'$\log_{10}(h/r)$',
-                   'mach-number'  : r'$\log_{10}(\mathcal{M})$'}
+                   'mach-number'  : r'$\log_{10}(\mathcal{M})$',
+                   'peak-frequency' : r'$\log_{10}(\nu_{\rm peak})$',
+                  }
         basecol = 'w' if args.negative else 'k'
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
