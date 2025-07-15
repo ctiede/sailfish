@@ -548,7 +548,9 @@ class AdiabaticParamSweep(SetupBase):
                 alpha=self.alpha,
                 diagnostics=self.diagnostics,
                 retrograde=self.retrograde,
-                reference_temperature=ss.surface_pressure_coefficient / ss.surface_density_coefficient,
+                # reference_temperature=ss.surface_pressure_coefficient / ss.surface_density_coefficient,
+                density_scale=ss.surface_density_coefficient,
+                pressure_scale=ss.surface_pressure_coefficient,
             )
 
     @property

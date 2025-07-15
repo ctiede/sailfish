@@ -14,7 +14,7 @@ TODO:
 #define NCONS 4
 #define PLM_THETA 1.5
 #define GRAD_MAX 1e6
-#define HRMAX 0.8
+#define HRMAX 1.0
 
 
 // ============================ MATH ==========================================
@@ -242,8 +242,9 @@ PRIVATE void point_mass_source_term(
             double phatx = -dy / (dr + 1e-12);
             double phaty =  dx / (dr + 1e-12);
             double dvphi = (vx - vx0) * phatx + (vy - vy0) * phaty;
-            double delta =  dt * sink_rate;
-            delta_cons[3] += dt / (delta - 1.0) * 0.5 * mdot * dvphi * dvphi;
+            // double delta =  dt * sink_rate;
+            // delta_cons[3] += dt / (delta - 1.0) * 0.5 * mdot * dvphi * dvphi;
+            delta_cons[3] -= dt * 0.5 * mdot * dvphi * dvphi;
             break;
         }
         case 3: // force-free
@@ -379,7 +380,8 @@ PRIVATE void beta_cooling_source_term(
     double tcool = beta * h / sqrt(cs2); // (beta / omega_eff)
     double temp = prim[3] / prim[0]; // I think these should both be in code units 
     double temp_ref = temp0 * pow(r, -9. / 10.); // TODO : Generalize this to problem generator
-    double qdot = (tcool > 0.0) ? prim[0] * (temp - temp_ref) / (gamma_law_index - 1.) / tcool : 0.0;
+    // double qdot = (tcool > 0.0) ? prim[0] * (temp - temp_ref) / (gamma_law_index - 1.) / tcool : 0.0;
+    double qdot = (beta > 0.0) ? prim[0] * max2(temp - temp_ref, 0.0) / (gamma_law_index - 1.) / tcool : 0.0;
     cons[3] -= dt * qdot;
 }
 

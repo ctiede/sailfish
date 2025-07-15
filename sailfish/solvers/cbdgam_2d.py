@@ -21,7 +21,7 @@ logger = getLogger(__name__)
 
 
 class Options(NamedTuple):
-    pressure_floor: float = 1e-12
+    pressure_floor: float = 1e-10
     density_floor: float = 1e-10
     velocity_ceiling: float = 10.
     mach_ceiling: float = 1e5
@@ -164,6 +164,7 @@ class Patch:
         buffer_central_mass = m1.mass + m2.mass
         buffer_surface_density = self.buffer_surface_density
         buffer_surface_pressure = self.buffer_surface_pressure
+        reference_temperature = self.physics.pressure_scale / self.physics.density_scale
 
         with self.execution_context:
             self.lib.cbdgam_2d_advance_rk[self.shape](
@@ -202,15 +203,15 @@ class Patch:
                 m2.sink_model.value,
                 self.physics.alpha,
                 self.physics.beta,
-                self.physics.reference_temperature,
+                reference_temperature,
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,
                 self.physics.cooling_coefficient,
                 self.physics.opacity,
                 self.options.mach_ceiling,
-                self.options.density_floor,
-                self.options.pressure_floor,
+                self.options.density_floor * self.physics.density_scale,
+                self.options.pressure_floor * self.physics.pressure_scale,
                 int(self.physics.constant_softening),
             )
 

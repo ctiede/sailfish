@@ -189,7 +189,7 @@ class Physics(NamedTuple):
     point_mass_function: Callable[[float], List[PointMass]] = None
     """ Callback function to supply point masses as a function of time """
 
-    reference_temperature: float = 0.0
+    # reference_temperature: float = 0.0
     """ Disk temperature (for beta cooling) """
 
     mach_number_function: Callable[[float], List[float]] = None
@@ -212,6 +212,12 @@ class Physics(NamedTuple):
 
     retrograde: bool = False
     """ If disk is retrograde """
+
+    density_scale: float = 1.0
+    """ Value of the density normalization """ 
+
+    pressure_scale: float = 1.0
+    """ Value of the pressure normalization """ 
 
     @property
     def num_particles(self):
