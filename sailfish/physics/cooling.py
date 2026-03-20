@@ -143,9 +143,14 @@ class ShakuraSunyaevDisk(NamedTuple):
 	def mach_number_profile(self, r:float) -> float:
 		return self._mach_number * r**(-1./20.)
 
+	def effective_temperature_profile(self, r:float) -> float:
+		return (3. * self._GM * self._accretion_rate / (8. * pi * cgs['sigmab']))**(1./4.) * (r * self._length)**(-3./4.)
+
 	def viscous_time(self, r:float) -> float:
 		mach = self.mach_number_profile(r)
 		return 2. / 3 * mach**2 / self.alpha * r**(3./2.)
+		# cs0 = self.gamma * self.surface_pressure_coefficient / self.surface_density_coefficient
+		# return 2. / 3. / self.alpha / cs0 * r**(7./5.)
 
 	# -------------------------------------------------------------------------
 	@property

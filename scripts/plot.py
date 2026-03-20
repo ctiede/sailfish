@@ -444,6 +444,7 @@ def main_cbdgam_2d():
         "vy": lambda p: p[:, :, 2],
         "pre": lambda p: p[:, :, 3],
         "eps": lambda p: p[:, :, 3] / p[:, :, 0] / (5./3. - 1.),
+        "rho": None,
         "temperature": None,
         "peak-frequency": None,
         "optical-depth": None,
@@ -520,6 +521,11 @@ def main_cbdgam_2d():
         "--save",
         action="store_true",
         help="save PNG files instead of showing a window",
+    )
+    parser.add_argument(
+        "--as-pdf",
+        '-pdf',
+        action="store_true",
     )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
@@ -722,11 +728,19 @@ def main_cbdgam_2d():
         fields["peak-frequency"] = PeakFrequency(cbdgam.get_ss_disk_model(filename))
         f = fields[args.field](prim).T
 
+        cmap = eval(args.cmap)
         if args.field == 'sigma':
             s0 = cbdgam.get_ss_disk_model(filename).surface_density_coefficient
             f = f / s0
         if args.field == 'mach-number':
             f = 1. / f
+        if args.field == 'peak-frequency':
+            cmap.set_over('red')
+            sig = prim[:,:,0].T
+            tau = sig * cbdgam.get_ss_disk_model(filename).opacity
+            f[tau < 10.0] = 1e10
+            print(cbdgam.get_ss_disk_model(filename).surface_density_coefficient)
+            print(cbdgam.get_ss_disk_model(filename).surface_pressure_coefficient)
         if args.log:
             f = np.log10(f)
 
@@ -736,7 +750,7 @@ def main_cbdgam_2d():
             origin="lower",
             vmin=args.vmin,
             vmax=args.vmax,
-            cmap=args.cmap,
+            cmap=cmap,
             extent=extent,
         )
         ax.set_aspect("equal")
@@ -795,7 +809,7 @@ def main_cbdgam_2d():
 
         if args.save:
             trans = (args.no_frame) or (args.negative)
-            pngname = filename.replace(".pk", ".png")
+            pngname = filename.replace(".pk", ".pdf") if args.as_pdf else filename.replace(".pk", ".png")
             print(pngname)
             fig.savefig(pngname, dpi=400, bbox_inches='tight', pad_inches=0.0 if args.no_frame else 0.05, transparent=trans)
             plt.close()

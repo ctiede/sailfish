@@ -437,9 +437,9 @@ class AdiabaticParamSweep(SetupBase):
         sign = 1.0 if (not self.retrograde) else -1.0
         x, y = coords
         r = sqrt(x * x + y * y)
-        j_current = 1 - self.ell0 / sqrt(r)
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
-        cavity = delt + (1. - delt) * exp(-((rcav / r) ** 12)) #if (not self.single_point_mass) else 1.0
+        j_current = 1 - self.ell0 / sqrt(r_softened)
+        cavity = delt + (1. - delt) * exp(-((rcav / r_softened) ** 12)) #if (not self.single_point_mass) else 1.0
         r_hat_x   =  x / max(r, 1e-12)
         r_hat_y   =  y / max(r, 1e-12)
         phi_hat_x = -y / max(r, 1e-12) * sign
@@ -457,26 +457,34 @@ class AdiabaticParamSweep(SetupBase):
 
         elif self.is_gamma_law:
             ss = ShakuraSunyaevDisk(
-                    central_mass_msun=self.binary_mass, 
-                    length_scale_pc=self.binary_separation,
-                    mach_number_a=self.mach_at_a,
-                    alpha=self.alpha,
-                    gamma=self.gamma_law_index,
-                 )
+                central_mass_msun=self.binary_mass,
+                length_scale_pc=self.binary_separation,
+                mach_number_a=self.mach_at_a,
+                alpha=self.alpha,
+                gamma=self.gamma_law_index,
+            )
             q = self.mass_ratio_init
-            sigma = ss.surface_density_profile(r_softened)
-            pressure = ss.surface_pressure_profile(r_softened)
-            nu = self.alpha * pressure / sigma * self.gamma_law_index * sqrt(r_softened**3 / GM)
-            vrnu = -3. / 2. * nu / r_softened
-            dpdr = -3. / 2. * ss.surface_pressure_coefficient * r_softened**(-5. / 2.)
-            qquad = 1. / 4. * q / (1. + q)**2 * (1. +  3. / 2. * self.eccentricity_init**2) * (not self.single_point_mass)
-            vphi2 = GM / r_softened * (1. + 3. * qquad / r_softened**2) + r_softened / sigma * dpdr
+            j_current = max(j_current, 1e-12)
+            sigma0 = ss.surface_density_profile(r_softened)
+            pressure0 = ss.surface_pressure_profile(r_softened)
+            sigma_j = sigma0 * j_current**(3.0 / 5.0)
+            pressure_j = pressure0 * j_current
+            dp0dr = -1.5 * ss.surface_pressure_coefficient * r_softened**(-2.5)
+            djdr = 0.5 * self.ell0 * r_softened**(-1.5)
+            dpdr_j = j_current * dp0dr + pressure0 * djdr
+            sigma_init = sigma_j * cavity
+            pressure_init = pressure_j * cavity
+            nu = self.alpha * self.gamma_law_index * pressure_j / sigma_j * sqrt(r_softened**3 / GM)
+            vrnu = -1.5 * nu / (r_softened * j_current)
+            qquad = 0.25 * q / (1.0 + q)**2 * (1.0 + 1.5 * self.eccentricity_init**2) * (not self.single_point_mass)
+            vphi2 = GM / r_softened * (1.0 + 3.0 * qquad / r_softened**2) + r_softened / sigma_j * dpdr_j
+            vphi2 = max(vphi2, 0.0)
             vrpert = self.disk_kick * y * exp(-((r / 3.5) ** 6)) if (not self.single_point_mass) else 0.0
-
-            primitive[0] = sigma * j_current * cavity
+            
+            primitive[0] = sigma_init
             primitive[1] = sqrt(vphi2) * phi_hat_x + (vrnu + vrpert) * r_hat_x
             primitive[2] = sqrt(vphi2) * phi_hat_y + (vrnu + vrpert) * r_hat_y
-            primitive[3] = pressure * cavity
+            primitive[3] = pressure_init
             #
             # # See eq. (A2) from Goodman (2003)
             # primitive[0] = (
