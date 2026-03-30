@@ -209,6 +209,13 @@ PRIVATE void point_mass_source_term(
     double fgrav_numerator = sigma * mass->mass * pow(r2 + r_soft * r_soft, -1.5);
     double fx = -fgrav_numerator * dx;
     double fy = -fgrav_numerator * dy;
+    if (mass->sink_model == 4) {
+        // Central sink instead of around each point mass
+        // More localized at sink boundary : only consider in sink radius * 1.5 + steeper drop-off
+        // Divide two because will be applied twice
+        double r = sqrt(x1 * x1 + y1 * y1);
+        sink_rate = (r < 1.5 * r_sink) ? mass->sink_rate / 2. * exp(-pow( r / r_sink, 8.0)) : 0.0; 
+    }
     double mdot = sigma * sink_rate * -1.0;
 
     switch (mass->sink_model)
@@ -255,6 +262,16 @@ PRIVATE void point_mass_source_term(
             delta_cons[1] = dt * fx;
             delta_cons[2] = dt * fy;
             delta_cons[3] = dt * (fx * vx + fy * vy);
+            break;
+        }
+        case 4: // central excision
+        { // Use standard sink -- e.g. eat mass and ang-mom bc no orbital velocity
+            double vx = prim[1];
+            double vy = prim[2];
+            delta_cons[0] = dt * mdot;
+            delta_cons[1] = dt * mdot * prim[1] + dt * fx;
+            delta_cons[2] = dt * mdot * prim[2] + dt * fy;
+            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vx * vx + vy * vy)) + dt * (fx * vx + fy * vy);
             break;
         }
         default: // sink is inactive

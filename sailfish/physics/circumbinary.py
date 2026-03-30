@@ -7,6 +7,7 @@ class SinkModel(Enum):
     ACCELERATION_FREE = 1
     TORQUE_FREE = 2
     FORCE_FREE = 3
+    CENTRAL_EXCISION = 4
 
 
 class EquationOfState(Enum):
