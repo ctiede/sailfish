@@ -112,3 +112,46 @@ class CylindricalExplosion(SetupBase):
             raise ValueError(f"eos must be isothermal or gamma-law, got {self.eos}")
         if self.use_dg and not self.is_isothermal:
             raise ValueError("DG mode is only available for eos=isothermal")
+
+class Shockplane(SetupBase):
+    """
+    Discontinuous initial data, with uniform density and pressure to either
+    side of the discontintuity at x=0.5.
+    """
+
+    def primitive(self, t, coords, primitive):
+        x, y = coords
+
+        if x < 0.0:
+            primitive[0] = 1.0
+            primitive[1] = 50.0
+            primitive[2] = 0.0
+            primitive[3] = 1000.0
+        else:
+            primitive[0] = 1.0
+            primitive[1] = 50.0
+            primitive[2] = 0.0
+            primitive[3] = 0.1
+
+    def mesh(self, resolution):
+        return PlanarCartesian2DMesh.centered_square(1.0, resolution)
+
+    @property
+    def physics(self):
+        return dict(eos_type=EquationOfState.GAMMA_LAW, gamma_law_index=5./3.)
+
+    @property
+    def solver(self):
+        return "cbdgam_2d"
+
+    @property
+    def boundary_condition(self):
+        return "outflow"
+
+    @property
+    def default_resolution(self):
+        return 200
+
+    @property
+    def default_end_time(self):
+        return 0.3

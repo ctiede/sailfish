@@ -49,53 +49,53 @@ PRIVATE void plm_gradient(double *yl, double *y0, double *yr, double *g)
     }
 }
 
-PRIVATE void fallback_if_dangerous(double *prim, const double *pcc, double dfloor, double pfloor, double vceil)
-{
-    int fallback = 0;
-    if (prim[0] < dfloor || !isfinite(prim[0]) || prim[3] < pfloor || !isfinite(prim[3])) 
-    {
-        fallback = 1;
-    }
-    if (fabs(prim[1]) > vceil || fabs(prim[2]) > vceil) 
-    {
-        fallback = 1;
-    }
-    if (fallback) 
-    {
-        printf("Fallback required in primitive reconstruction\n");
-        prim[0] = pcc[0];
-        prim[1] = pcc[1];
-        prim[2] = pcc[2];
-        prim[3] = pcc[3];
-    }
-}
+// PRIVATE void fallback_if_dangerous(double *prim, const double *pcc, double dfloor, double pfloor, double vceil)
+// {
+//     int fallback = 0;
+//     if (prim[0] < dfloor || !isfinite(prim[0]) || prim[3] < pfloor || !isfinite(prim[3])) 
+//     {
+//         fallback = 1;
+//     }
+//     if (fabs(prim[1]) > vceil || fabs(prim[2]) > vceil) 
+//     {
+//         fallback = 1;
+//     }
+//     if (fallback) 
+//     {
+//         printf("Fallback required in primitive reconstruction\n");
+//         prim[0] = pcc[0];
+//         prim[1] = pcc[1];
+//         prim[2] = pcc[2];
+//         prim[3] = pcc[3];
+//     }
+// }
 
-PRIVATE void check_conserved(const double *cons, int i, int j, const char *label) {
-    double rho = cons[0];
-    double px  = cons[1];
-    double py  = cons[2];
-    double en  = cons[3];
+// PRIVATE void check_conserved(const double *cons, int i, int j, const char *label) {
+//     double rho = cons[0];
+//     double px  = cons[1];
+//     double py  = cons[2];
+//     double en  = cons[3];
 
-    int bad = 0;
+//     int bad = 0;
 
-    if (!isfinite(rho) || rho <= 0.0) {
-        printf("[BAD CONSERVED] %s at (%d, %d): rho = %.4e\n", label, i, j, rho);
-        bad = 1;
-    }
-    if (!isfinite(en) || en <= 0.0) {
-        printf("[BAD CONSERVED] %s at (%d, %d): energy = %.4e\n", label, i, j, en);
-        bad = 1;
-    }
-    if (!isfinite(px) || !isfinite(py)) {
-        printf("[BAD CONSERVED] %s at (%d, %d): momentum = (%.4e, %.4e)\n", label, i, j, px, py);
-        bad = 1;
-    }
+//     if (!isfinite(rho) || rho <= 0.0) {
+//         printf("[BAD CONSERVED] %s at (%d, %d): rho = %.4e\n", label, i, j, rho);
+//         bad = 1;
+//     }
+//     if (!isfinite(en) || en <= 0.0) {
+//         printf("[BAD CONSERVED] %s at (%d, %d): energy = %.4e\n", label, i, j, en);
+//         bad = 1;
+//     }
+//     if (!isfinite(px) || !isfinite(py)) {
+//         printf("[BAD CONSERVED] %s at (%d, %d): momentum = (%.4e, %.4e)\n", label, i, j, px, py);
+//         bad = 1;
+//     }
 
-    if (bad) {
-        double ke = 0.5 * (px * px + py * py) / rho;
-        printf("    total energy = %.4e, kinetic = %.4e, internal = %.4e\n", en, ke, en - ke);
-    }
-}
+//     if (bad) {
+//         double ke = 0.5 * (px * px + py * py) / rho;
+//         printf("    total energy = %.4e, kinetic = %.4e, internal = %.4e\n", en, ke, en - ke);
+//     }
+// }
 
 
 // ============================ INTERNAL STRUCTS ==============================
@@ -313,7 +313,7 @@ PRIVATE void point_masses_source_term(
 // ============================================================================
 PRIVATE double sound_speed_squared(
     double gamma_law_index,
-    double *prim)
+    const double *prim)
 {
     return prim[3] / prim[0] * gamma_law_index;
 }
@@ -519,6 +519,17 @@ PRIVATE void primitive_to_flux(
     flux[3] = vn * (cons[3] + pressure);
 }
 
+
+PRIVATE double primitive_max_wavespeed(const double *prim, double cs2)
+{
+    double cs = sqrt(cs2);
+    double vx = prim[1];
+    double vy = prim[2];
+    double ax = max2(fabs(vx - cs), fabs(vx + cs));
+    double ay = max2(fabs(vy - cs), fabs(vy + cs));
+    return max2(ax, ay);
+}
+
 PRIVATE void primitive_to_outer_wavespeeds(
     const double *prim,
     double *wavespeeds,
@@ -531,17 +542,7 @@ PRIVATE void primitive_to_outer_wavespeeds(
     wavespeeds[1] = vn + cs;
 }
 
-PRIVATE double primitive_max_wavespeed(const double *prim, double cs2)
-{
-    double cs = sqrt(cs2);
-    double vx = prim[1];
-    double vy = prim[2];
-    double ax = max2(fabs(vx - cs), fabs(vx + cs));
-    double ay = max2(fabs(vy - cs), fabs(vy + cs));
-    return max2(ax, ay);
-}
-
-PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, double cs2, int direction, double gamma_law_index)
+PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, int direction, double gamma_law_index)
 {
     double ul[NCONS];
     double ur[NCONS];
@@ -549,21 +550,30 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, doub
     double fr[NCONS];
     double al[2];
     double ar[2];
+    double cs2l = sound_speed_squared(gamma_law_index, pl);
+    double cs2r = sound_speed_squared(gamma_law_index, pr);
 
     primitive_to_conserved(pl, ul, gamma_law_index);
     primitive_to_conserved(pr, ur, gamma_law_index);
     primitive_to_flux(pl, ul, fl, direction);
     primitive_to_flux(pr, ur, fr, direction);
-    primitive_to_outer_wavespeeds(pl, al, cs2, direction);
-    primitive_to_outer_wavespeeds(pr, ar, cs2, direction);
+    primitive_to_outer_wavespeeds(pl, al, cs2l, direction);
+    primitive_to_outer_wavespeeds(pr, ar, cs2r, direction);
 
     const double am = min3(0.0, al[0], ar[0]);
     const double ap = max3(0.0, al[1], ar[1]);
 
+    // upwinding
+    if (am == 0.0) { for (int q=0; q<NCONS; ++q) flux[q] = fl[q]; return; }
+    if (ap == 0.0) { for (int q=0; q<NCONS; ++q) flux[q] = fr[q]; return; }
+
+    double apam = ap * am;
+    double inv_denom = 1.0 / (ap - am);
     for (int q = 0; q < NCONS; ++q)
     {
-        flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+        flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * apam) * inv_denom;
     }
+    return;
 }
 
 
@@ -740,32 +750,25 @@ PUBLIC void cbdgam_2d_advance_rk(
             prjp[q] = prj[q] - 0.5 * gyrj[q];
         }
 
-        // TODO: Add a flag to toggle this
-        // fallback_if_dangerous(plim, pli, density_floor, pressure_floor, velocity_ceiling);
-        // fallback_if_dangerous(plip, pcc, density_floor, pressure_floor, velocity_ceiling);
-        // fallback_if_dangerous(prim, pcc, density_floor, pressure_floor, velocity_ceiling);
-        // fallback_if_dangerous(prip, pri, density_floor, pressure_floor, velocity_ceiling);
-        // fallback_if_dangerous(pljm, plj, density_floor, pressure_floor, velocity_ceiling);
-        // fallback_if_dangerous(pljp, pcc, density_floor, pressure_floor, velocity_ceiling);
-        // fallback_if_dangerous(prjm, pcc, density_floor, pressure_floor, velocity_ceiling);
-        // fallback_if_dangerous(prjp, prj, density_floor, pressure_floor, velocity_ceiling);
-
         double fli[NCONS];
         double fri[NCONS];
         double flj[NCONS];
         double frj[NCONS];
         double ucc[NCONS];
-
-        double cs2li = sound_speed_squared(gamma_law_index, pli);
-        double cs2ri = sound_speed_squared(gamma_law_index, pri);
-        double cs2lj = sound_speed_squared(gamma_law_index, plj);
-        double cs2rj = sound_speed_squared(gamma_law_index, prj);
         double hcc = disk_height(&mass_list, xc, yc, pcc, gamma_law_index);
+        // double cs2lim = sound_speed_squared(gamma_law_index, plim);
+        // double cs2lip = sound_speed_squared(gamma_law_index, plip);
+        // double cs2rim = sound_speed_squared(gamma_law_index, prim);
+        // double cs2rip = sound_speed_squared(gamma_law_index, prip);
+        // double cs2ljm = sound_speed_squared(gamma_law_index, pljm);
+        // double cs2ljp = sound_speed_squared(gamma_law_index, pljp);
+        // double cs2rjm = sound_speed_squared(gamma_law_index, prjm);
+        // double cs2rjp = sound_speed_squared(gamma_law_index, prjp);
 
-        riemann_hlle(plim, plip, fli, cs2li, 0, gamma_law_index);
-        riemann_hlle(prim, prip, fri, cs2ri, 0, gamma_law_index);
-        riemann_hlle(pljm, pljp, flj, cs2lj, 1, gamma_law_index);
-        riemann_hlle(prjm, prjp, frj, cs2rj, 1, gamma_law_index);
+        riemann_hlle(plim, plip, fli, 0, gamma_law_index);
+        riemann_hlle(prim, prip, fri, 0, gamma_law_index);
+        riemann_hlle(pljm, pljp, flj, 1, gamma_law_index);
+        riemann_hlle(prjm, prjp, frj, 1, gamma_law_index);
 
         if (alpha > 0.0)
         {
@@ -782,6 +785,10 @@ PUBLIC void cbdgam_2d_advance_rk(
             shear_strain(gxcc, gycc, dx, dy, scc);
 
             double cs2cc = sound_speed_squared(gamma_law_index, pcc);
+            double cs2li = sound_speed_squared(gamma_law_index, pli);
+            double cs2ri = sound_speed_squared(gamma_law_index, pri);
+            double cs2lj = sound_speed_squared(gamma_law_index, plj);
+            double cs2rj = sound_speed_squared(gamma_law_index, prj);
             double hli = disk_height(&mass_list, xl, yc, pli, gamma_law_index);
             double hri = disk_height(&mass_list, xr, yc, pri, gamma_law_index);
             double hlj = disk_height(&mass_list, xc, yl, plj, gamma_law_index);
