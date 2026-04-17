@@ -129,12 +129,10 @@ struct KeplerianBuffer {
 
 // ============================ GRAVITY =======================================
 // ============================================================================
-PRIVATE double disk_height(
+PRIVATE double omega_tilde(
     struct PointMassList *mass_list,
     double x1,
-    double y1,
-    double *prim,
-    double gamma_law_index)
+    double y1)
 {
     if (mass_list->masses[0].mass == 0.0 && mass_list->masses[1].mass == 0.0)
     {
@@ -157,10 +155,20 @@ PRIVATE double disk_height(
             omegatilde2 += mp * pow(r, -3.0);
         }
     }
+    return sqrt(omegatilde2);
+}
+
+PRIVATE double disk_height(
+    struct PointMassList *mass_list,
+    double x1,
+    double y1,
+    double *prim,
+    double gamma_law_index)
+{
     double sigma = prim[0];
     double pres  = prim[3];
-
-    return sqrt(gamma_law_index * pres / sigma) / sqrt(omegatilde2);
+    double omega = omega_tilde(mass_list, x1, y1);
+    return sqrt(gamma_law_index * pres / sigma) / omega;
 }
 
 PRIVATE void point_mass_source_term(
@@ -324,6 +332,7 @@ PRIVATE void buffer_source_term(
     double yc,
     double dt,
     double *cons,
+    double alpha,
     double gamma_law_index)
 {
     if (buffer->is_enabled)
@@ -339,16 +348,23 @@ PRIVATE void buffer_source_term(
 
         if (rc > onset_radius)
         {
-            double pf = surface_density * sqrt(central_mass / rc);
-            double px = pf * (-yc / rc);
-            double py = pf * ( xc / rc);
-            double kinetic_energy = 0.5 * (px * px + py * py) / surface_density;
-            double energy = surface_pressure / (gamma_law_index - 1.0) + kinetic_energy;
-            double u0[NCONS] = {surface_density, px, py, energy};
-
             double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
             //double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
             double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
+
+            double invr = 1.0 / rc;
+            double cosphi = xc * invr;
+            double sinphi = yc * invr;
+            double dm = -3.0 * alpha * gamma_law_index * surface_pressure / omega_outer;
+            double vr = dm / (2.0 * rc * surface_density); // factors of pi cancel
+            double vp = sqrt(central_mass / rc);
+            double vx = vr * cosphi - vp * sinphi;
+            double vy = vr * sinphi + vp * cosphi;
+            double px = surface_density * vx;
+            double py = surface_density * vy;
+            double kinetic_energy = 0.5 * (px * px + py * py) / surface_density;
+            double energy = surface_pressure / (gamma_law_index - 1.0) + kinetic_energy;
+            double u0[NCONS] = {surface_density, px, py, energy};
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -457,11 +473,11 @@ PRIVATE void conserved_to_primitive(
     }
  
     // TEMP: Check for precission loss in energy equation
-    double epsilon = 2.2204460492503131e-16; // <float.h> -> DBL_EPSILON, double precession limit
-    double internal_energy = cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]) / cons[0];
-    if (fabs(internal_energy) < epsilon * fabs(cons[3])) {
-        printf("Pressure floor is adding heat, e = %e\n", internal_energy);
-    }
+    // double epsilon = 2.2204460492503131e-16; // <float.h> -> DBL_EPSILON, double precession limit
+    // double internal_energy = cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]) / cons[0];
+    // if (fabs(internal_energy) < epsilon * fabs(cons[3])) {
+    //     printf("Pressure floor is adding heat, e = %e\n", internal_energy);
+    // }
     
     prim[0] = rho;
     prim[1] = vx;
@@ -470,7 +486,6 @@ PRIVATE void conserved_to_primitive(
 
     double r = sqrt(xc * xc + yc * yc + 1e-12);
     double h = disk_height(mass_list, xc, yc, prim, gamma_law_index);
-
     if (h / r > HRMAX) {
     	double omega_tilde = sqrt(gamma_law_index * pres / rho) / h;
     	prim[3] = rho / gamma_law_index * pow(r * omega_tilde * HRMAX, 2);
@@ -564,8 +579,8 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, int 
     const double ap = max3(0.0, al[1], ar[1]);
 
     // upwinding
-    if (am == 0.0) { for (int q=0; q<NCONS; ++q) flux[q] = fl[q]; return; }
-    if (ap == 0.0) { for (int q=0; q<NCONS; ++q) flux[q] = fr[q]; return; }
+    if (am >= 0.0) { for (int q=0; q<NCONS; ++q) flux[q] = fl[q]; return; }
+    if (ap <= 0.0) { for (int q=0; q<NCONS; ++q) flux[q] = fr[q]; return; }
 
     double apam = ap * am;
     double inv_denom = 1.0 / (ap - am);
@@ -755,15 +770,6 @@ PUBLIC void cbdgam_2d_advance_rk(
         double flj[NCONS];
         double frj[NCONS];
         double ucc[NCONS];
-        double hcc = disk_height(&mass_list, xc, yc, pcc, gamma_law_index);
-        // double cs2lim = sound_speed_squared(gamma_law_index, plim);
-        // double cs2lip = sound_speed_squared(gamma_law_index, plip);
-        // double cs2rim = sound_speed_squared(gamma_law_index, prim);
-        // double cs2rip = sound_speed_squared(gamma_law_index, prip);
-        // double cs2ljm = sound_speed_squared(gamma_law_index, pljm);
-        // double cs2ljp = sound_speed_squared(gamma_law_index, pljp);
-        // double cs2rjm = sound_speed_squared(gamma_law_index, prjm);
-        // double cs2rjp = sound_speed_squared(gamma_law_index, prjp);
 
         riemann_hlle(plim, plip, fli, 0, gamma_law_index);
         riemann_hlle(prim, prip, fri, 0, gamma_law_index);
@@ -783,44 +789,37 @@ PUBLIC void cbdgam_2d_advance_rk(
             shear_strain(gxlj, gylj, dx, dy, slj);
             shear_strain(gxrj, gyrj, dx, dy, srj);
             shear_strain(gxcc, gycc, dx, dy, scc);
+            double omegali = omega_tilde(&mass_list, xl, yc);
+            double omegari = omega_tilde(&mass_list, xr, yc);
+            double omegalj = omega_tilde(&mass_list, xc, yl);
+            double omegarj = omega_tilde(&mass_list, xc, yr);
 
-            double cs2cc = sound_speed_squared(gamma_law_index, pcc);
-            double cs2li = sound_speed_squared(gamma_law_index, pli);
-            double cs2ri = sound_speed_squared(gamma_law_index, pri);
-            double cs2lj = sound_speed_squared(gamma_law_index, plj);
-            double cs2rj = sound_speed_squared(gamma_law_index, prj);
-            double hli = disk_height(&mass_list, xl, yc, pli, gamma_law_index);
-            double hri = disk_height(&mass_list, xr, yc, pri, gamma_law_index);
-            double hlj = disk_height(&mass_list, xc, yl, plj, gamma_law_index);
-            double hrj = disk_height(&mass_list, xc, yr, prj, gamma_law_index);
+            double mulim = alpha * gamma_law_index * plim[3] / omegali; // dynamic viscosity \mu = \nu\Sigma
+            double mulip = alpha * gamma_law_index * plip[3] / omegali;
+            double murim = alpha * gamma_law_index * prim[3] / omegari;
+            double murip = alpha * gamma_law_index * prip[3] / omegari;
+            double muljm = alpha * gamma_law_index * pljm[3] / omegalj;
+            double muljp = alpha * gamma_law_index * pljp[3] / omegalj;
+            double murjm = alpha * gamma_law_index * prjm[3] / omegarj;
+            double murjp = alpha * gamma_law_index * prjp[3] / omegarj;
 
-            double nucc = alpha * hcc * sqrt(cs2cc);
-            double nuli = alpha * hli * sqrt(cs2li);
-            double nuri = alpha * hri * sqrt(cs2ri);
-            double nulj = alpha * hlj * sqrt(cs2lj);
-            double nurj = alpha * hrj * sqrt(cs2rj);
-
-            fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
-            fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y
-            fri[1] -= 0.5 * (nucc * pcc[0] * scc[0] + nuri * pri[0] * sri[0]); // x-x
-            fri[2] -= 0.5 * (nucc * pcc[0] * scc[1] + nuri * pri[0] * sri[1]); // x-y
-            flj[1] -= 0.5 * (nulj * plj[0] * slj[2] + nucc * pcc[0] * scc[2]); // y-x
-            flj[2] -= 0.5 * (nulj * plj[0] * slj[3] + nucc * pcc[0] * scc[3]); // y-y
-            frj[1] -= 0.5 * (nucc * pcc[0] * scc[2] + nurj * prj[0] * srj[2]); // y-x
-            frj[2] -= 0.5 * (nucc * pcc[0] * scc[3] + nurj * prj[0] * srj[3]); // y-y
-
-            fli[3] -= 0.5 * (nuli * pli[0] * sli[0] * pli[1] + nucc * pcc[0] * scc[0] * pcc[1]); // v^x \tau^x_x
-            fri[3] -= 0.5 * (nucc * pcc[0] * scc[0] * pcc[1] + nuri * pri[0] * sri[0] * pri[1]);
-            fli[3] -= 0.5 * (nuli * pli[0] * sli[1] * pli[2] + nucc * pcc[0] * scc[1] * pcc[2]); // v^y \tau^x_y
-            fri[3] -= 0.5 * (nucc * pcc[0] * scc[1] * pcc[2] + nuri * pri[0] * sri[1] * pri[2]);
-            flj[3] -= 0.5 * (nulj * plj[0] * slj[2] * plj[1] + nucc * pcc[0] * scc[2] * pcc[1]); // v^x \tau^y_x
-            frj[3] -= 0.5 * (nucc * pcc[0] * scc[2] * pcc[1] + nurj * prj[0] * srj[2] * prj[1]);
-            flj[3] -= 0.5 * (nulj * plj[0] * slj[3] * plj[2] + nucc * pcc[0] * scc[3] * pcc[2]); // v^y \tau^y_y
-            frj[3] -= 0.5 * (nucc * pcc[0] * scc[3] * pcc[2] + nurj * prj[0] * srj[3] * prj[2]);
+            fli[1] -= 0.5 * (mulim * sli[0] + mulip * scc[0]); // tau_xx
+            fli[2] -= 0.5 * (mulim * sli[1] + mulip * scc[1]); // tau_xy
+            fri[1] -= 0.5 * (murim * scc[0] + murip * sri[0]); // tau_xx
+            fri[2] -= 0.5 * (murim * scc[1] + murip * sri[1]); // tau_xy
+            flj[1] -= 0.5 * (muljm * slj[2] + muljp * scc[2]); // tau_yx
+            flj[2] -= 0.5 * (muljm * slj[3] + muljp * scc[3]); // tau_yy
+            frj[1] -= 0.5 * (murjm * scc[2] + murjp * srj[2]); // tau_yx
+            frj[2] -= 0.5 * (murjm * scc[3] + murjp * srj[3]); // tau_yy
+            fli[3] -= 0.5 * (mulim * (sli[0] * plim[1] + sli[1] * plim[2]) + mulip * (scc[0] * plip[1] + scc[1] * plip[2])); // x-left face:  v_x tau_xx + v_y tau_xy
+            fri[3] -= 0.5 * (murim * (scc[0] * prim[1] + scc[1] * prim[2]) + murip * (sri[0] * prip[1] + sri[1] * prip[2])); // x-right face: v_x tau_xx + v_y tau_xy
+            flj[3] -= 0.5 * (muljm * (slj[2] * pljm[1] + slj[3] * pljm[2]) + muljp * (scc[2] * pljp[1] + scc[3] * pljp[2])); // y-left face:  v_x tau_yx + v_y tau_yy
+            frj[3] -= 0.5 * (murjm * (scc[2] * prjm[1] + scc[3] * prjm[2]) + murjp * (srj[2] * prjp[1] + srj[3] * prjp[2])); // y-right face: v_x tau_yx + v_y tau_yy
         }
 
+        double hcc = disk_height(&mass_list, xc, yc, pcc, gamma_law_index);
         primitive_to_conserved(pcc, ucc, gamma_law_index);
-        buffer_source_term(&buffer, xc, yc, dt, ucc, gamma_law_index);
+        buffer_source_term(&buffer, xc, yc, dt, ucc, alpha, gamma_law_index);
         point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc, constant_softening, gamma_law_index);
         cooling_term(cooling_coefficient, opacity, mach_ceiling, dt, pcc, ucc, gamma_law_index);
         beta_cooling_source_term(beta, &mass_list, temp0, xc, yc,  dt, pcc, ucc, gamma_law_index);
@@ -934,5 +933,108 @@ PUBLIC void cbdgam_2d_point_mass_source_term(
         double *uc = &cons_rate[ncc];
         double h = disk_height(&mass_list, xc, yc, pc, gamma_law_index);
         point_mass_source_term(&mass_list.masses[which_mass - 1], xc, yc, 1.0, pc, h, uc, constant_softening, gamma_law_index);
+    }
+}
+
+
+// ======================== HLLC future option ================================
+// ============================================================================
+PRIVATE void riemann_hllc(const double *pl, const double *pr, double *flux, int direction, double gamma_law_index)
+{
+    double ul[NCONS];
+    double ur[NCONS];
+    double fl[NCONS];
+    double fr[NCONS];
+    double al[2];
+    double ar[2];
+
+    double cs2l = sound_speed_squared(gamma_law_index, pl);
+    double cs2r = sound_speed_squared(gamma_law_index, pr);
+
+    primitive_to_conserved(pl, ul, gamma_law_index);
+    primitive_to_conserved(pr, ur, gamma_law_index);
+    primitive_to_flux(pl, ul, fl, direction);
+    primitive_to_flux(pr, ur, fr, direction);
+    primitive_to_outer_wavespeeds(pl, al, cs2l, direction);
+    primitive_to_outer_wavespeeds(pr, ar, cs2r, direction);
+
+    const double SL = min3(0.0, al[0], ar[0]);
+    const double SR = max3(0.0, al[1], ar[1]);
+
+    // Supersonic upwinding
+    if (SL >= 0.0) { for (int q = 0; q < NCONS; ++q) flux[q] = fl[q]; return; }
+    if (SR <= 0.0) { for (int q = 0; q < NCONS; ++q) flux[q] = fr[q]; return; }
+
+    // Normal / tangential primitive variables
+    const double rhoL = pl[0];
+    const double rhoR = pr[0];
+    const double pL   = pl[3];
+    const double pR   = pr[3];
+    const double unL = pl[1 + direction];
+    const double unR = pr[1 + direction];
+    const double utL = pl[1 + (1 - direction)];
+    const double utR = pr[1 + (1 - direction)];
+    const double EL = ul[3];
+    const double ER = ur[3];
+
+    // Contact wave speed
+    const double denom = rhoL * (SL - unL) - rhoR * (SR - unR);
+    if (fabs(denom) < 1e-14) { riemann_hlle(pl, pr, flux, direction, gamma_law_index); return; }
+
+    // Star pressure estimate
+    const double SM = (pR - pL + rhoL * unL * (SL - unL) - rhoR * unR * (SR - unR)) / denom;
+    const double pStarL = pL + rhoL * (SL - unL) * (SM - unL);
+    const double pStarR = pR + rhoR * (SR - unR) * (SM - unR);
+    const double pStar  = 0.5 * (pStarL + pStarR);
+
+    // Fall back if star region looks nonphysical
+    if (!(pStar >= 0.0)) { riemann_hlle(pl, pr, flux, direction, gamma_law_index); return; }
+
+    // Left star state
+    const double facL = rhoL * (SL - unL) / (SL - SM);
+    double usL[NCONS];
+    usL[0] = facL;
+    if (direction == 0)
+    {
+        usL[1] = facL * SM;
+        usL[2] = facL * utL;
+    }
+    else
+    {
+        usL[1] = facL * utL;
+        usL[2] = facL * SM;
+    }
+    usL[3] = ((SL - unL) * EL - pL * unL + pStar * SM) / (SL - SM);
+
+    // Right star state
+    const double facR = rhoR * (SR - unR) / (SR - SM);
+    double usR[NCONS];
+    usR[0] = facR;
+    if (direction == 0)
+    {
+        usR[1] = facR * SM;
+        usR[2] = facR * utR;
+    }
+    else
+    {
+        usR[1] = facR * utR;
+        usR[2] = facR * SM;
+    }
+    usR[3] = ((SR - unR) * ER - pR * unR + pStar * SM) / (SR - SM);
+
+    // HLLC flux
+    if (SM >= 0.0)
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fl[q] + SL * (usL[q] - ul[q]);
+        }
+    }
+    else
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fr[q] + SR * (usR[q] - ur[q]);
+        }
     }
 }
