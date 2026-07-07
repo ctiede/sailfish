@@ -15,7 +15,7 @@ from sailfish.physics.circumbinary import (
 )
 from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
-from sailfish.physics.cooling import cgs, band_limits, remapped_effective_temperature
+from sailfish.physics.cooling import ShakuraSunyaevDisk, cgs, band_limits, remapped_effective_temperature
 
 logger = getLogger(__name__)
 
@@ -587,9 +587,13 @@ class Solver(SolverBase):
         """
         xp = self.xp
         ng = self.num_guard
-        mass_unit = self._physics.binary_mass_msun * cgs["msun"]
-        length_unit = self._physics.binary_separation_pc * cgs["pc"]
-        flux_unit = mass_unit / (length_unit**3 / (cgs["G"] * mass_unit))**(3./2.)
+        physics = self._physics
+        disk = ShakuraSunyaevDisk(physics.binary_mass_msun, 
+                                  physics.binary_separation_pc,
+                                  physics.disk_mach_at_a,
+                                  physics.alpha,
+                                  physics.gamma_law_index)
+        flux_unit = disk._mass / disk._time**3
         density = patch.primitive[ng:-ng, ng:-ng, 0]
         pressure = patch.primitive[ng:-ng, ng:-ng, 3]        
         x, y = patch.cell_center_coordinate_arrays
@@ -597,7 +601,7 @@ class Solver(SolverBase):
         r1 = xp.sqrt((x - m1.position_x)**2 + (y - m1.position_y)**2)
         r2 = xp.sqrt((x - m2.position_x)**2 + (y - m2.position_y)**2)
         omega_tilde = xp.sqrt(m1.mass * r1**(-3.0) + m2.mass * r2**(-3.0))
-        temperature, tau_eff = remapped_effective_temperature(density, pressure, omega_tilde, mass_unit, length_unit, self._physics.opacity, self._physics.gamma_law_index)
+        temperature, tau_eff = remapped_effective_temperature(density, pressure, omega_tilde, disk)
         nnu = 128
         nu0, nu1 = band_limits[band]
         nus = xp.logspace(xp.log10(nu0), xp.log10(nu1), nnu)
@@ -605,6 +609,6 @@ class Solver(SolverBase):
         # Shape: (nnu, ni, nj)
         x = xp.minimum(cgs['h'] * nus[:, None, None] / (cgs['kb'] * temperature[None, :, :]), 700.0)
         bnu = (2.0 * cgs['h'] * nus[:, None, None]**3 / cgs['c']**2 / xp.expm1(x))
-        fnu = 2.0 * xp.pi * bnu # One-face flux = pi Bnu; factor 2 for both disk surfaces.
+        fnu = 2.0 * xp.pi * bnu # factor 2 for both disk surfaces.
         f_band_cgs = xp.trapz(fnu, nus, axis=0)
-        return f_band_cgs / flux_unit * mask # Convert CGS flux to code-flux units, because reductions later multiply by da in code-area units.
+        return f_band_cgs / flux_unit * mask # Convert CGS to code-flux units, because reductions later multiply by da in code-area units.

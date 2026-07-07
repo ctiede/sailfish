@@ -202,36 +202,41 @@ class ShakuraSunyaevDisk(NamedTuple):
 		return qdot_coeff
 
 def remapped_effective_temperature(
-    density,
-    pressure,
-    omega_tilde,
-    mass_unit,
-    length_unit,
-    opacity,
-    gamma=5.0/3.0,
+    sig,
+    pre,
+    omega,
+    disk,
+    ftarget=0.5,
 ):
     """
     Return effective temperature in Kelvin and effective optical depth.
 
     Parameters
     ----------
-    density, pressure : array-like
+    ftarget : float
+        Target eddington fraction
+    sig, pre : array-like
         Code-unit surface density and vertically integrated pressure.
-    omega_tilde : array-like
+    omega : array-like
         Code-unit local orbital frequency.
     mass_unit, length_unit : float
         Physical code units in cgs: grams and cm.
     opacity : float
         Electron-scattering opacity in code units.
     """
-    temperature = cgs["mp"] / cgs["kb"] * pressure / density * (cgs["G"] * mass_unit / length_unit)
-    h = (gamma * pressure / density)**0.5 / omega_tilde
-    rho_cgs = 0.5 * density / h * (mass_unit / length_unit**3)
-    kappa_abs = 5e24 * rho_cgs * temperature**(-7./2.) / (length_unit**2 / mass_unit)
-    tau_es = density * opacity
+    fedd = disk._eddington_fraction
+    density = sig * (ftarget / fedd)**(3./5.)
+    pressure = pre * (ftarget / fedd)
+    mp = cgs['mp'] / disk._mass
+    kb = cgs['kb'] / (disk._mass * disk._length**2 / disk._time**2)
+    temperature = (mp / kb) * pressure / density
+    h = (disk.gamma * pressure / density)**0.5 / omega
+    rho_cgs = 0.5 * density / h * (disk._mass / disk._length**3)
+    kappa_abs = 5e24 * rho_cgs * temperature**(-7./2.) / (disk._length**2 / disk._mass)
+    tau_es = density * disk.opacity
     tau_abs = density * kappa_abs
     tau_tot = tau_es + tau_abs
-    tau_eff = (3.0 * tau_abs * (tau_abs + tau_es))**0.5
+    tau_eff = (3.0 * tau_abs * tau_tot)**0.5
     teff = (4. / 3. / tau_tot)**0.25 * temperature
     return teff, tau_eff
 

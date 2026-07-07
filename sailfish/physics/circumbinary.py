@@ -226,6 +226,9 @@ class Physics(NamedTuple):
     binary_separation_pc: float = 1.0
     """ Binary separation in parsec """
 
+    disk_mach_at_a: float = 1.0
+    """ Disk mach number at r=a for disk model """
+
     @property
     def num_particles(self):
         if self.point_mass_function is None:

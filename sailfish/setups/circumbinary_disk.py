@@ -561,6 +561,7 @@ class AdiabaticParamSweep(SetupBase):
                 pressure_scale=disk.surface_pressure_coefficient,
                 binary_mass_msun = self.binary_mass,
                 binary_separation_pc = self.binary_separation,
+                disk_mach_at_a = self.mach_at_a
             )
 
     @property
