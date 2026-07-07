@@ -220,6 +220,12 @@ class Physics(NamedTuple):
     pressure_scale: float = 1.0
     """ Value of the pressure normalization """ 
 
+    binary_mass_msun: float = 1.0
+    """ Total mass of the binary in solar masses """
+
+    binary_separation_pc: float = 1.0
+    """ Binary separation in parsec """
+
     @property
     def num_particles(self):
         if self.point_mass_function is None:

@@ -456,7 +456,7 @@ class AdiabaticParamSweep(SetupBase):
             primitive[2] = sqrt(GM / r_softened) * phi_hat_y
 
         elif self.is_gamma_law:
-            ss = ShakuraSunyaevDisk(
+            disk = ShakuraSunyaevDisk(
                 central_mass_msun=self.binary_mass,
                 length_scale_pc=self.binary_separation,
                 mach_number_a=self.mach_at_a,
@@ -465,11 +465,11 @@ class AdiabaticParamSweep(SetupBase):
             )
             q = self.mass_ratio_init
             j_current = max(j_current, 1e-12)
-            sigma0 = ss.surface_density_profile(r_softened)
-            pressure0 = ss.surface_pressure_profile(r_softened)
+            sigma0 = disk.surface_density_profile(r_softened)
+            pressure0 = disk.surface_pressure_profile(r_softened)
             sigma_j = sigma0 * j_current**(3.0 / 5.0)
             pressure_j = pressure0 * j_current
-            dp0dr = -1.5 * ss.surface_pressure_coefficient * r_softened**(-2.5)
+            dp0dr = -1.5 * disk.surface_pressure_coefficient * r_softened**(-2.5)
             djdr = 0.5 * self.ell0 * r_softened**(-1.5)
             dpdr_j = j_current * dp0dr + pressure0 * djdr
             sigma_init = sigma_j * cavity
@@ -530,7 +530,7 @@ class AdiabaticParamSweep(SetupBase):
             )
 
         elif self.is_gamma_law:
-            ss = ShakuraSunyaevDisk(
+            disk = ShakuraSunyaevDisk(
                     central_mass_msun=self.binary_mass, 
                     length_scale_pc=self.binary_separation,
                     mach_number_a=self.mach_at_a,
@@ -544,10 +544,10 @@ class AdiabaticParamSweep(SetupBase):
                 buffer_is_enabled=self.buffer_is_enabled,
                 buffer_driving_rate=1000.0,  
                 buffer_onset_width=0.1,
-                # cooling_coefficient=ss.cooling_coefficient(),
-                cooling_coefficient=ss.cooling_coefficient() if self.beta == 0.0 else 0.0,
+                # cooling_coefficient=disk.cooling_coefficient(),
+                cooling_coefficient=disk.cooling_coefficient() if self.beta == 0.0 else 0.0,
                 beta = self.beta,
-                opacity=ss.opacity,
+                opacity=disk.opacity,
                 constant_softening=self.constant_softening,
                 viscosity_model=ViscosityModel.CONSTANT_ALPHA
                 if self.alpha > 0.0
@@ -556,9 +556,11 @@ class AdiabaticParamSweep(SetupBase):
                 alpha=self.alpha,
                 diagnostics=self.diagnostics,
                 retrograde=self.retrograde,
-                # reference_temperature=ss.surface_pressure_coefficient / ss.surface_density_coefficient,
-                density_scale=ss.surface_density_coefficient,
-                pressure_scale=ss.surface_pressure_coefficient,
+                # reference_temperature=disk.surface_pressure_coefficient / disk.surface_density_coefficient,
+                density_scale=disk.surface_density_coefficient,
+                pressure_scale=disk.surface_pressure_coefficient,
+                binary_mass_msun = self.binary_mass,
+                binary_separation_pc = self.binary_separation,
             )
 
     @property
@@ -572,6 +574,19 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="torque", which_mass="both", accretion=True),
                 # dict(quantity="angular_momentum"),
                 # dict(quantity="buffer_angular_momentum", buffer=True),
+            ]
+        elif self.which_diagnostics == "lightcurves":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="torque", which_mass="both", gravity=True),
+                dict(quantity="torque", which_mass="both", accretion=True),
+                dict(quantity="optical"),
+                dict(quantity="nir"),
+                dict(quantity="nuv"),
+                dict(quantity="fuv"),
+                dict(quantity="ionizing"),
             ]
         elif self.which_diagnostics == "forces":
             return [

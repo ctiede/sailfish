@@ -21,6 +21,14 @@ cgs = dict(
 		yr = 3.254e7,
 	)
 
+band_limits = {
+            "nir":      (1.0e14, 3.0e14),
+            "optical":  (3.0e14, 8.0e14),
+            "nuv":      (8.0e14, 1.5e15),
+            "fuv":      (1.5e15, 3.29e15),
+            "ionizing": (3.29e15, 1.0e18),  # h nu > 13.6 eV
+        }
+
 logger = getLogger(__name__)
 
 class ShakuraSunyaevDisk(NamedTuple):
@@ -36,7 +44,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 	mach_number_a     : float
 	alpha             : float
 	gamma             : float
-	# fix_fedd          : int
+	# fix_fedd          : float # 0 if not used; >0 is used
 
 	# -------------------------------------------------------------------------
 	@property
@@ -73,6 +81,11 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 		   f_edd = 4pi * sqrt(2/3) * (mp^4 / kb^4 * sigmab / kappa * alpha)^(1/2) * (GM)^(7/4) * Mach(r)^-5 * r^(-1/4) / Mdot_edd
 		"""
+		# if self.fix_fedd > 0.0:
+		# 	return self.fix_fedd
+		# else:
+		# 	f0 = 10.2604 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**0.5 * self.gamma**(-2.)
+		# 	return f0 * self.alpha**0.5 * self._GM**(7./4.) * self._length**(-1./4.) * self.mach_number_a**-5 / self._eddington_rate
 		f0 = 10.2604 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**0.5 * self.gamma**(-2.)
 		return f0 * self.alpha**0.5 * self._GM**(7./4.) * self._length**(-1./4.) * self.mach_number_a**-5 / self._eddington_rate
 	
@@ -120,7 +133,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 		"""
 		m0 = 1.593063 * (cgs['mp'] / cgs['kb'])**(2./5.) * (cgs['sigmab'] / cgs['kappa'])**(1./10.) * self.gamma**(-2./5.)
 		return m0 * self.alpha**(1./10.) * self._GM**(7./20.) * self._accretion_rate**(-1./5.) * self._length**(-1./20.)
-	
+
 
 	# -------------------------------------------------------------------------
 	@property
@@ -142,6 +155,9 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 	def mach_number_profile(self, r:float) -> float:
 		return self._mach_number * r**(-1./20.)
+
+	def scale_height_profile(self, r: float) -> float:
+	    return r / self.mach_number_profile(r)
 
 	def effective_temperature_profile(self, r:float) -> float:
 		return (3. * self._GM * self._accretion_rate / (8. * pi * cgs['sigmab']))**(1./4.) * (r * self._length)**(-3./4.)
@@ -184,6 +200,40 @@ class ShakuraSunyaevDisk(NamedTuple):
 		logger.info(f"approximate optical depth : {self.optical_depth(1.):0.4f}")
 		logger.info(f"cooling coefficient : {qdot_coeff:0.2e}")
 		return qdot_coeff
+
+def remapped_effective_temperature(
+    density,
+    pressure,
+    omega_tilde,
+    mass_unit,
+    length_unit,
+    opacity,
+    gamma=5.0/3.0,
+):
+    """
+    Return effective temperature in Kelvin and effective optical depth.
+
+    Parameters
+    ----------
+    density, pressure : array-like
+        Code-unit surface density and vertically integrated pressure.
+    omega_tilde : array-like
+        Code-unit local orbital frequency.
+    mass_unit, length_unit : float
+        Physical code units in cgs: grams and cm.
+    opacity : float
+        Electron-scattering opacity in code units.
+    """
+    temperature = cgs["mp"] / cgs["kb"] * pressure / density * (cgs["G"] * mass_unit / length_unit)
+    h = (gamma * pressure / density)**0.5 / omega_tilde
+    rho_cgs = 0.5 * density / h * (mass_unit / length_unit**3)
+    kappa_abs = 5e24 * rho_cgs * temperature**(-7./2.) / (length_unit**2 / mass_unit)
+    tau_es = density * opacity
+    tau_abs = density * kappa_abs
+    tau_tot = tau_es + tau_abs
+    tau_eff = (3.0 * tau_abs * (tau_abs + tau_es))**0.5
+    teff = (4. / 3. / tau_tot)**0.25 * temperature
+    return teff, tau_eff
 
 
 # =============================================================================
