@@ -446,8 +446,8 @@ class Solver(SolverBase):
 
             # thermal lightcurves
             # -----------------------------------------------------------------
-            if quantity in ("nir", "optical", "nuv", "fuv", "ionizing"):
-               return self.thermal_band_flux(patch, quantity)
+            if quantity in ("nir", "optical", "uv", "euv", "xray"):
+               return self.thermal_band_flux(patch, quantity, fedd=0.5)
 
             q = quantity
             i = self.patches.index(patch)
@@ -578,7 +578,7 @@ class Solver(SolverBase):
             patch.new_iteration()
 
     # -------------------------------------------
-    def thermal_band_flux(self, patch, band):
+    def thermal_band_flux(self, patch, band, fedd):
         """
         Return the two-sided thermal flux in a requested band [erg s^-1 cm^-2]
         evaluated over the active cells of one patch.
@@ -601,11 +601,11 @@ class Solver(SolverBase):
         r1 = xp.sqrt((x - m1.position_x)**2 + (y - m1.position_y)**2)
         r2 = xp.sqrt((x - m2.position_x)**2 + (y - m2.position_y)**2)
         omega_tilde = xp.sqrt(m1.mass * r1**(-3.0) + m2.mass * r2**(-3.0))
-        temperature, tau_eff = remapped_effective_temperature(density, pressure, omega_tilde, disk)
+        temperature, tau_eff = remapped_effective_temperature(density, pressure, omega_tilde, disk, ftarget=fedd)
+        mask = (r1 > m1.sink_radius) & (r2 > m2.sink_radius) & (tau_eff > 2.0)
         nnu = 128
         nu0, nu1 = band_limits[band]
         nus = xp.logspace(xp.log10(nu0), xp.log10(nu1), nnu)
-        mask = (r1 > m1.sink_radius) & (r2 > m2.sink_radius)
         # Shape: (nnu, ni, nj)
         x = xp.minimum(cgs['h'] * nus[:, None, None] / (cgs['kb'] * temperature[None, :, :]), 700.0)
         bnu = (2.0 * cgs['h'] * nus[:, None, None]**3 / cgs['c']**2 / xp.expm1(x))

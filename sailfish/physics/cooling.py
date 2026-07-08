@@ -24,9 +24,9 @@ cgs = dict(
 band_limits = {
             "nir":      (1.0e14, 3.0e14),
             "optical":  (3.0e14, 8.0e14),
-            "nuv":      (8.0e14, 1.5e15),
-            "fuv":      (1.5e15, 3.29e15),
-            "ionizing": (3.29e15, 1.0e18),  # h nu > 13.6 eV
+            "uv":       (8.0e14, 3.0e16),
+            "euv":      (3.29e15, 3.0e16),
+            "xray":     (3.0e16, 3.0e19),
         }
 
 logger = getLogger(__name__)

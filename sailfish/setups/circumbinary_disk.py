@@ -585,9 +585,9 @@ class AdiabaticParamSweep(SetupBase):
                 dict(quantity="torque", which_mass="both", accretion=True),
                 dict(quantity="optical"),
                 dict(quantity="nir"),
-                dict(quantity="nuv"),
-                dict(quantity="fuv"),
-                dict(quantity="ionizing"),
+                dict(quantity="uv"),
+                dict(quantity="euv"),
+                dict(quantity="xray"),
             ]
         elif self.which_diagnostics == "forces":
             return [
