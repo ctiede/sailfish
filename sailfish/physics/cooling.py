@@ -201,6 +201,23 @@ class ShakuraSunyaevDisk(NamedTuple):
 		logger.info(f"cooling coefficient : {qdot_coeff:0.2e}")
 		return qdot_coeff
 
+# -----------------------------------------------------------------------------
+def integrate_flux_chunked(xp, temperature, nu0, nu1, nnu=128, chunk_size=8):
+    """
+    Return two-sided band-integrated blackbody flux in cgs:
+    erg s^-1 cm^-2.
+    """
+    nus = xp.logspace(xp.log10(nu0), xp.log10(nu1), nnu)
+    f_band = xp.zeros_like(temperature)
+    for i0 in range(0, nnu - 1, chunk_size):
+        i1 = min(i0 + chunk_size + 1, nnu)
+        nu = nus[i0:i1]
+        xplanck = xp.minimum(cgs["h"] * nu[:, None, None] / (cgs["kb"] * temperature[None, :, :]), 700.0)
+        bnu = (2.0 * cgs["h"] * nu[:, None, None]**3 / cgs["c"]**2 / xp.expm1(xplanck))
+        fnu = 2.0 * xp.pi * bnu
+        f_band += xp.trapz(fnu, nu, axis=0)
+    return f_band
+
 def remapped_effective_temperature(
     sig,
     pre,

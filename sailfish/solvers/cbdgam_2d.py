@@ -15,7 +15,8 @@ from sailfish.physics.circumbinary import (
 )
 from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
-from sailfish.physics.cooling import ShakuraSunyaevDisk, cgs, band_limits, remapped_effective_temperature
+from sailfish.physics.cooling import ShakuraSunyaevDisk, cgs
+from sailfish.physics.cooling import band_limits, remapped_effective_temperature, integrate_flux_chunked
 
 logger = getLogger(__name__)
 
@@ -578,7 +579,7 @@ class Solver(SolverBase):
             patch.new_iteration()
 
     # -------------------------------------------
-    def thermal_band_flux(self, patch, band, fedd):
+    def thermal_band_flux(self, patch, band, fedd, nnu=128):
         """
         Return the two-sided thermal flux in a requested band [erg s^-1 cm^-2]
         evaluated over the active cells of one patch.
@@ -593,7 +594,6 @@ class Solver(SolverBase):
                                   physics.disk_mach_at_a,
                                   physics.alpha,
                                   physics.gamma_law_index)
-        flux_unit = disk._mass / disk._time**3
         density = patch.primitive[ng:-ng, ng:-ng, 0]
         pressure = patch.primitive[ng:-ng, ng:-ng, 3]        
         x, y = patch.cell_center_coordinate_arrays
@@ -603,12 +603,7 @@ class Solver(SolverBase):
         omega_tilde = xp.sqrt(m1.mass * r1**(-3.0) + m2.mass * r2**(-3.0))
         temperature, tau_eff = remapped_effective_temperature(density, pressure, omega_tilde, disk, ftarget=fedd)
         mask = (r1 > m1.sink_radius) & (r2 > m2.sink_radius) & (tau_eff > 2.0)
-        nnu = 128
         nu0, nu1 = band_limits[band]
-        nus = xp.logspace(xp.log10(nu0), xp.log10(nu1), nnu)
-        # Shape: (nnu, ni, nj)
-        x = xp.minimum(cgs['h'] * nus[:, None, None] / (cgs['kb'] * temperature[None, :, :]), 700.0)
-        bnu = (2.0 * cgs['h'] * nus[:, None, None]**3 / cgs['c']**2 / xp.expm1(x))
-        fnu = 2.0 * xp.pi * bnu # factor 2 for both disk surfaces.
-        f_band_cgs = xp.trapz(fnu, nus, axis=0)
-        return f_band_cgs / flux_unit * mask # Convert CGS to code-flux units, because reductions later multiply by da in code-area units.
+        flux_unit = disk._mass / disk._time**3
+        flux_cgs = integrate_flux_chunked(xp, temperature, nu0, nu1, nnu=nnu, chunk_size=8)
+        return flux_cgs / flux_unit * mask # Convert CGS to code-flux units, because reductions later multiply by da in code-area units.
