@@ -629,10 +629,11 @@ class UltraThinDisk(SetupBase):
         n  = 4.0
         sigma0 = 1.0
         r_cav  = 2.5
-        delta0 = 1e-5
+        delta0 = 1e-8
         x, y = coords
-        r    = sqrt(x * x + y * y)
+        r  = max(sqrt(x * x + y * y), 1e-12)
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
+        q  = self.mass_ratio
 
         if self.alpha == 0.0:
             sigma = 1.0
@@ -643,17 +644,20 @@ class UltraThinDisk(SetupBase):
         else:
             raise ValueError("alpha must be zero or positive")
 
-        omegaB    = (GM / a ** 3) ** 0.5
-        omega0    = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
-        omega     = (omega0**-n + omegaB**-n) ** (-1 / n)
-        cavity    = exp(-((r_cav / r) ** 12))
-        jdot_term = 1 - self.ell0 / sqrt(r)
+        qquad = 0.25 * q / (1.0 + q)**2 * (1.0 + 1.5 * self.eccentricity**2) * (not self.single_point_mass)
+        omegaB = (GM / a ** 3) ** 0.5
+        cavity = exp(-((r_cav / r) ** 12))
+        cs2 = GM / (self.mach_number**2 * r_softened)
+        dlncavity_dlnr = 12.0 * (r_cav / r)**12 if cavity > 1e-4 else 0.0
+        pressure_cavity = cs2 / r**2 * dlncavity_dlnr
+        omega0 = (GM / r**3 * (1.0 + 3.0 * qquad * (a / r_softened)**2 - 1.0 / self.mach_number**2) + pressure_cavity)**0.5
+        omega = (omega0**-n + omegaB**-n) ** (-1 / n)
+        j_current = 1 - self.ell0 / sqrt(r_softened)
+        vr_eq = -1.5 * nu / (r_softened * j_current)
+        vr_pert = 1e-3 * y * exp(-((r / 3.5) ** 6))
+        sigma_init = sigma0 * sigma * j_current * cavity + delta0
 
-        vr_eq   = 0.0
-        # vr_eq   = -3 / 2. * nu / r_softened * exp(-((5 / r) ** 12))
-        vr_pert = 1e-2 * y * exp(-((r / 3.5) ** 6))
-
-        primitive[0] = sigma0 #* sigma * jdot_term * cavity + delta0
+        primitive[0] = max(sigma_init, delta0)
         primitive[1] = omega * -y + (vr_eq + vr_pert) * x / r
         primitive[2] = omega * +x + (vr_eq + vr_pert) * y / r
 
