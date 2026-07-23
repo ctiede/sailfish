@@ -621,6 +621,7 @@ class UltraThinDisk(SetupBase):
     buffer_onset_width  = param(0.5, "buffer ramp distance", mutable=True)
     use_dg              = param(False, "use the DG solver")
     ell0                = param(0.0, "initial accretion eigenvalue guess for initial density profile")
+    disk_kick           = param(0.0, "kick velocity to seed eccentric cavity growth")
     fix_mini_mach       = param(False, "fix minidisk scale-height to h/r = mach^-1 = 0.1", mutable=True)
 
     def primitive(self, t, coords, primitive):
@@ -654,7 +655,7 @@ class UltraThinDisk(SetupBase):
         omega = (omega0**-n + omegaB**-n) ** (-1 / n)
         j_current = 1 - self.ell0 / sqrt(r_softened)
         vr_eq = -1.5 * nu / (r_softened * j_current)
-        vr_pert = 1e-3 * y * exp(-((r / 3.5) ** 6))
+        vr_pert = self.disk_kick * y * exp(-((r / 3.5) ** 6))
         sigma_init = sigma0 * sigma * j_current * cavity + delta0
 
         primitive[0] = max(sigma_init, delta0)
